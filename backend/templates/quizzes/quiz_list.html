@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block title %}Mis Quizzes – QuizLive{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>📝 Mis Quizzes</h1>
+    <a href="{% url 'quiz_create' %}" class="btn btn-primary">+ Nuevo Quiz</a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if quizzes %}
+        <div class="quiz-grid">
+            {% for quiz in quizzes %}
+            <div class="quiz-card {% if quiz.publicado %}published{% endif %}">
+                <div class="quiz-card-header">
+                    <span class="quiz-status">
+                        {% if quiz.publicado %}✅ Publicado{% else %}📋 Borrador{% endif %}
+                    </span>
+                    <span class="quiz-course-tag">{{ quiz.course.nombre }}</span>
+                </div>
+                <h3>{{ quiz.titulo }}</h3>
+                <p class="text-muted">{{ quiz.descripcion|truncatechars:80 }}</p>
+                <div class="quiz-meta">
+                    <span>📊 {{ quiz.total_preguntas }} preguntas</span>
+                    <span>⏱️ {{ quiz.tiempo_por_pregunta }}s/pregunta</span>
+                </div>
+                <div class="quiz-actions">
+                    <a href="{% url 'quiz_builder' quiz.pk %}" class="btn btn-sm btn-primary">Construir</a>
+                    <a href="{% url 'quiz_edit' quiz.pk %}" class="btn btn-sm btn-secondary">Editar</a>
+                    <a href="{% url 'quiz_delete' quiz.pk %}" class="btn btn-sm btn-danger">Eliminar</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No has creado quizzes aún.</p>
+            <a href="{% url 'quiz_create' %}" class="btn btn-primary">Crear primer quiz</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

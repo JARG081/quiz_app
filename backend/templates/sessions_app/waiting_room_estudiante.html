@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block title %}Esperando – {{ session.codigo }} – QuizLive{% endblock %}
+
+{% block content %}
+<div class="waiting-student">
+    <div class="waiting-animation">
+        <div class="pulse-ring"></div>
+        <div class="waiting-icon">⏳</div>
+    </div>
+    <h1>Sala de Espera</h1>
+    <p>Conectado a la sesión <strong>{{ session.codigo }}</strong></p>
+    <p class="text-muted">{{ session.quiz.titulo }}</p>
+    <p id="status-msg" class="status-text">Esperando a que el docente inicie el quiz…</p>
+    <div class="participants-mini">
+        <span>👥 Participantes: <strong id="count">—</strong></span>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const STATE_URL = `/sessions/{{ session.pk }}/api/state/`;
+const PLAY_URL = `/sessions/{{ session.pk }}/quiz/`;
+const DASHBOARD_URL = `/estudiante/dashboard/`;
+
+async function poll() {
+    try {
+        const res = await fetch(STATE_URL);
+        const data = await res.json();
+        document.getElementById('count').textContent = data.participant_count;
+
+        if (data.student_expulsado) {
+            window.location.href = DASHBOARD_URL;
+            return;
+        }
+        if (data.estado === 'EN_CURSO') {
+            window.location.href = PLAY_URL;
+        } else if (data.estado === 'FINALIZADO') {
+            window.location.href = `/sessions/{{ session.pk }}/results/`;
+        }
+    } catch(e) { console.error(e); }
+}
+
+poll();
+setInterval(poll, 2000);
+</script>
+{% endblock %}

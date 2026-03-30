@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block title %}Editar Usuario – QuizLive{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <a href="{% url 'admin_dashboard' %}" class="btn btn-ghost">← Volver</a>
+    <h1>Editar Usuario: {{ target.username }}</h1>
+</div>
+
+<div class="card card-md">
+    <form method="post" class="form-vertical">
+        {% csrf_token %}
+        <div class="form-group">
+            <label>Usuario</label>
+            <input type="text" class="form-control" value="{{ target.username }}" disabled>
+        </div>
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" class="form-control" value="{{ target.email }}">
+        </div>
+        <div class="form-group">
+            <label for="role">Rol</label>
+            <select id="role" name="role" class="form-control">
+                <option value="ESTUDIANTE" {% if profile.role == 'ESTUDIANTE' %}selected{% endif %}>Estudiante</option>
+                <option value="DOCENTE" {% if profile.role == 'DOCENTE' %}selected{% endif %}>Docente</option>
+                <option value="ADMIN" {% if profile.role == 'ADMIN' %}selected{% endif %}>Admin</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="password">Nueva contraseña <span class="hint">(dejar vacío para no cambiar)</span></label>
+            <input type="password" id="password" name="password" class="form-control">
+        </div>
+        <div class="form-actions">
+            <a href="{% url 'admin_dashboard' %}" class="btn btn-ghost">Cancelar</a>
+            <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

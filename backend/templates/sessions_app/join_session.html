@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}Unirse a Sesión – QuizLive{% endblock %}
+
+{% block content %}
+<div class="join-container">
+    <div class="join-card">
+        <div class="join-icon">🎯</div>
+        <h1>Unirse a Quiz</h1>
+        <p>Ingresa el código de sesión que te dio tu docente</p>
+        <form method="post" class="join-form">
+            {% csrf_token %}
+            <input type="text" name="codigo" class="form-control code-input"
+                   placeholder="ABC123" maxlength="8" required autofocus
+                   style="text-transform:uppercase; font-size:2rem; text-align:center; letter-spacing:0.3em">
+            <button type="submit" class="btn btn-primary btn-block btn-lg">Unirse al Quiz</button>
+        </form>
+        <a href="{% url 'estudiante_dashboard' %}" class="btn btn-ghost mt-4">← Volver al inicio</a>
+    </div>
+</div>
+{% endblock %}

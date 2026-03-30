@@ -1,0 +1,210 @@
+{% extends 'base.html' %}
+{% block title %}Quiz en Vivo – {{ session.codigo }} – QuizLive{% endblock %}
+
+{% block content %}
+<div class="live-docente-layout">
+    <!-- Header -->
+    <div class="live-header">
+        <div class="live-meta">
+            <span class="live-badge">🔴 EN VIVO</span>
+            <span>{{ session.quiz.titulo }}</span>
+            <code>{{ session.codigo }}</code>
+        </div>
+        <div class="live-controls">
+            <button id="btn-next" class="btn btn-primary" onclick="nextQuestion()">Siguiente ▶</button>
+            <button id="btn-end" class="btn btn-danger" onclick="endSession()">Finalizar ◼</button>
+        </div>
+    </div>
+
+    <!-- Main Panel -->
+    <div class="live-main">
+        <!-- Timer -->
+        <div class="timer-panel">
+            <div class="timer-circle" id="timer-circle">
+                <span id="timer-val">--</span>
+            </div>
+            <div class="question-progress" id="q-progress">Pregunta -- de --</div>
+        </div>
+
+        <!-- Current Question -->
+        <div class="question-display" id="question-display">
+            <p class="text-muted">Cargando pregunta...</p>
+        </div>
+
+        <!-- Answer Bar Chart -->
+        <div class="answers-chart" id="answers-chart"></div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="live-sidebar">
+        <div class="sidebar-card">
+            <h3>👥 Participantes</h3>
+            <div class="stat-big" id="participant-count">—</div>
+        </div>
+        <div class="sidebar-card">
+            <h3>✅ Respondieron</h3>
+            <div class="stat-big" id="answers-count">—</div>
+        </div>
+        <div id="participants-list" class="participants-list"></div>
+    </div>
+</div>
+
+<div id="modal-confirm" class="modal hidden">
+    <div class="modal-box">
+        <p id="modal-msg"></p>
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+            <button class="btn btn-primary" id="modal-confirm-btn">Continuar</button>
+        </div>
+    </div>
+</div>
+
+<!-- LADDER MODAL -->
+<div id="modal-ladder" class="modal hidden">
+    <div class="modal-box modal-lg">
+        <h2 style="text-align:center; font-size: 2rem; margin-bottom: 20px;">🏆 Ranking en vivo (Top 6)</h2>
+        <div id="ladder-list" class="ladder-list">
+            <!-- Rellenado por JS -->
+        </div>
+        <div class="modal-actions" style="margin-top:20px; text-align:center; width:100%; display:block;">
+            <button class="btn btn-primary btn-lg" onclick="executeNextQuestion()">Siguiente Pregunta real ▶</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const SESSION_ID = '{{ session.pk }}';
+const CSRF = '{{ csrf_token }}';
+const STATE_URL = `/sessions/${SESSION_ID}/api/state/`;
+const PARTICIPANTS_URL = `/sessions/${SESSION_ID}/api/participants/`;
+const RESULTS_URL = (q) => `/sessions/${SESSION_ID}/api/results/${q}/`;
+const NEXT_URL = `/sessions/${SESSION_ID}/next/`;
+const END_URL = `/sessions/${SESSION_ID}/end/`;
+const FINAL_URL = `/sessions/${SESSION_ID}/results/`;
+
+let lastQuestion = 0;
+let pollInterval;
+
+async function pollState() {
+    try {
+        const [stRes, ptRes] = await Promise.all([
+            fetch(STATE_URL), fetch(PARTICIPANTS_URL)
+        ]);
+        const state = await stRes.json();
+        const parts = await ptRes.json();
+
+        // Timer
+        const timer = document.getElementById('timer-val');
+        const circle = document.getElementById('timer-circle');
+        timer.textContent = state.tiempo_restante;
+        const pct = state.quiz_tiempo ? (state.tiempo_restante / state.quiz_tiempo * 100) : 100;
+        circle.className = 'timer-circle' + (state.tiempo_restante <= 5 ? ' timer-urgent' : '');
+
+        // Progress
+        document.getElementById('q-progress').textContent =
+            `Pregunta ${state.pregunta_actual} de ${state.total_preguntas}`;
+
+        // Question
+        if (state.pregunta && state.pregunta.id !== lastQuestion) {
+            lastQuestion = state.pregunta.id;
+            const q = state.pregunta;
+            document.getElementById('question-display').innerHTML =
+                `<h2>${q.enunciado}</h2>
+                 <div class="options-row">
+                 ${q.opciones.map(o => `<span class="option-chip">${o.letra}. ${o.texto}</span>`).join('')}
+                 </div>`;
+        }
+
+        // Counts
+        document.getElementById('participant-count').textContent = parts.participants.length;
+        document.getElementById('answers-count').textContent = state.answers_count;
+
+        // Participants with answered indicator
+        document.getElementById('participants-list').innerHTML =
+            (parts.participants || []).map(p =>
+                `<div class="participant-item ${p.answered ? 'answered' : ''}">${p.username} ${p.answered ? '✅' : '⏳'}
+                 <button onclick="expel(${p.id})" class="btn btn-xs btn-danger">✕</button></div>`
+            ).join('');
+
+        if (state.estado === 'FINALIZADO') {
+            clearInterval(pollInterval);
+            window.location.href = FINAL_URL;
+        }
+    } catch(e) { console.error(e); }
+}
+
+async function expel(studentId) {
+    await fetch(`/sessions/${SESSION_ID}/expel/${studentId}/`, {
+        method:'POST', headers:{'X-CSRFToken': CSRF}
+    });
+}
+
+let showingLadder = false;
+
+async function nextQuestion() {
+    if (!showingLadder) {
+        // Mostrar ranking en vivo primero
+        try {
+            const ladderRes = await fetch(`/sessions/${SESSION_ID}/api/leaderboard/`);
+            const ladderData = await ladderRes.json();
+            
+            document.getElementById('ladder-list').innerHTML = ladderData.ranking.map(r => `
+                <div class="ladder-item ${r.posicion === 1 ? 'ladder-first' : ''}">
+                    <span class="ladder-pos">#${r.posicion}</span>
+                    <span class="ladder-name">${r.username}</span>
+                    <span class="ladder-score">${r.score} pts</span>
+                </div>
+            `).join('') || '<p style="text-align:center">Sin puntajes aún...</p>';
+            
+            document.getElementById('modal-ladder').classList.remove('hidden');
+            showingLadder = true;
+        } catch(e) { console.error(e); }
+        return;
+    }
+    document.getElementById('modal-ladder').classList.add('hidden');
+    executeNextQuestion();
+}
+
+async function executeNextQuestion() {
+    document.getElementById('modal-ladder').classList.add('hidden');
+    showingLadder = false;
+    const res = await fetch(NEXT_URL, {method:'POST', headers:{'X-CSRFToken':CSRF}});
+    const data = await res.json();
+    if (data.needs_confirm) {
+        showModal(`Hay ${data.pending} estudiante(s) que no han respondido. ¿Avanzar igual?`,
+            () => forceNext());
+    } else if (data.finalizado) {
+        window.location.href = FINAL_URL;
+    }
+}
+
+async function forceNext() {
+    const body = new URLSearchParams({force:'true'});
+    const res = await fetch(NEXT_URL, {method:'POST', headers:{'X-CSRFToken':CSRF}, body});
+    const data = await res.json();
+    if (data.finalizado) window.location.href = FINAL_URL;
+    closeModal();
+}
+
+async function endSession() {
+    showModal('¿Finalizar la sesión ahora?', async () => {
+        await fetch(END_URL, {method:'POST', headers:{'X-CSRFToken':CSRF}});
+        window.location.href = FINAL_URL;
+    });
+}
+
+function showModal(msg, cb) {
+    document.getElementById('modal-msg').textContent = msg;
+    document.getElementById('modal-confirm-btn').onclick = cb;
+    document.getElementById('modal-confirm').classList.remove('hidden');
+}
+function closeModal() {
+    document.getElementById('modal-confirm').classList.add('hidden');
+}
+
+pollState();
+pollInterval = setInterval(pollState, 1500);
+</script>
+{% endblock %}

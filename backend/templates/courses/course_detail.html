@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block title %}{{ course.nombre }} – QuizLive{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <a href="{% url 'course_list' %}" class="btn btn-ghost">← Cursos</a>
+    <h1>📚 {{ course.nombre }}</h1>
+</div>
+
+{% if course.descripcion %}
+<p class="course-desc">{{ course.descripcion }}</p>
+{% endif %}
+
+<div class="two-columns">
+    <!-- Docentes -->
+    <div class="card">
+        <div class="card-header">
+            <h2>🎓 Docentes ({{ assigned_teachers|length }})</h2>
+        </div>
+        <div class="card-body">
+            {% for ct in assigned_teachers %}
+            <div class="person-row">
+                <span>{{ ct.teacher.username }}</span>
+                <form method="post" action="{% url 'remove_teacher' course.pk ct.teacher.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-danger">Remover</button>
+                </form>
+            </div>
+            {% empty %}
+            <p class="text-muted">Sin docentes asignados.</p>
+            {% endfor %}
+
+            <form method="post" action="{% url 'assign_teacher' course.pk %}" class="inline-form mt-8">
+                {% csrf_token %}
+                <select name="teacher_id" class="form-control">
+                    {% for d in docentes %}
+                    <option value="{{ d.pk }}">{{ d.username }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-primary">Asignar</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Estudiantes -->
+    <div class="card">
+        <div class="card-header">
+            <h2>🧑‍💻 Estudiantes ({{ enrolled_students|length }})</h2>
+        </div>
+        <div class="card-body">
+            {% for e in enrolled_students %}
+            <div class="person-row">
+                <span>{{ e.student.username }}</span>
+                <form method="post" action="{% url 'unenroll_student' course.pk e.student.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-danger">Remover</button>
+                </form>
+            </div>
+            {% empty %}
+            <p class="text-muted">Sin estudiantes inscritos.</p>
+            {% endfor %}
+
+            <form method="post" action="{% url 'enroll_student' course.pk %}" class="inline-form mt-8">
+                {% csrf_token %}
+                <select name="student_id" class="form-control">
+                    {% for s in estudiantes %}
+                    <option value="{{ s.pk }}">{{ s.username }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-primary">Inscribir</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

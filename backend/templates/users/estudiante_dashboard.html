@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block title %}Panel Estudiante – QuizLive{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🧑‍💻 Panel del Estudiante</h1>
+    <a href="{% url 'join_session' %}" class="btn btn-primary">🎯 Unirse a Sesión</a>
+</div>
+
+<div class="stats-row">
+    <div class="stat-card">
+        <span class="stat-number">{{ mis_cursos|length }}</span>
+        <span class="stat-label">Cursos inscritos</span>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h2>Mis Cursos</h2></div>
+    <div class="card-body">
+        {% if mis_cursos %}
+        <div class="course-grid">
+            {% for e in mis_cursos %}
+            <div class="course-card">
+                <div class="course-icon">📚</div>
+                <h3>{{ e.course.nombre }}</h3>
+                <p class="text-muted">{{ e.course.descripcion|truncatechars:80 }}</p>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No estás inscrito en ningún curso aún.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="join-session-banner">
+    <div class="join-banner-content">
+        <h2>¿Hay una sesión en vivo?</h2>
+        <p>Ingresa el código que te dio tu docente para unirte al quiz.</p>
+        <form action="{% url 'join_session' %}" method="post" class="inline-form">
+            {% csrf_token %}
+            <input type="text" name="codigo" class="form-control code-input" placeholder="ABC123" maxlength="8" style="text-transform:uppercase">
+            <button type="submit" class="btn btn-primary">Unirse</button>
+        </form>
+    </div>
+</div>
+
+<div class="quick-links">
+    <a href="{% url 'student_stats' %}" class="quick-link-card">
+        <span class="ql-icon">📊</span>
+        <span>Mis Estadísticas</span>
+    </a>
+</div>
+{% endblock %}

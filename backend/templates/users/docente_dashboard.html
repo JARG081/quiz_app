@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% block title %}Panel Docente – QuizLive{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🎓 Panel del Docente</h1>
+    <div class="header-actions">
+        <a href="{% url 'quiz_list' %}" class="btn btn-primary">Mis Quizzes</a>
+        <a href="{% url 'create_session' %}" class="btn btn-secondary">Nueva Sesión</a>
+    </div>
+</div>
+
+<div class="stats-row">
+    <div class="stat-card">
+        <span class="stat-number">{{ mis_cursos|length }}</span>
+        <span class="stat-label">Cursos asignados</span>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h2>Mis Cursos</h2></div>
+    <div class="card-body">
+        {% if mis_cursos %}
+        <div class="course-grid">
+            {% for ct in mis_cursos %}
+            <div class="course-card">
+                <div class="course-icon">📚</div>
+                <h3>{{ ct.course.nombre }}</h3>
+                <p class="text-muted">{{ ct.course.descripcion|truncatechars:80 }}</p>
+                <div class="course-actions">
+                    <a href="{% url 'quiz_list' %}?course={{ ct.course.pk }}" class="btn btn-sm btn-primary">Ver Quizzes</a>
+                    <a href="{% url 'create_session' %}" class="btn btn-sm btn-secondary">Sesión</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No tienes cursos asignados aún. Contacta al administrador.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="quick-links">
+    <a href="{% url 'quiz_list' %}" class="quick-link-card">
+        <span class="ql-icon">📝</span>
+        <span>Mis Quizzes</span>
+    </a>
+    <a href="{% url 'session_list' %}" class="quick-link-card">
+        <span class="ql-icon">▶️</span>
+        <span>Historial Sesiones</span>
+    </a>
+    <a href="{% url 'docente_stats' %}" class="quick-link-card">
+        <span class="ql-icon">📊</span>
+        <span>Estadísticas</span>
+    </a>
+</div>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% block title %}Sesiones – QuizLive{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>▶️ Mis Sesiones</h1>
+    <a href="{% url 'create_session' %}" class="btn btn-primary">+ Nueva Sesión</a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if sessions %}
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Código</th>
+                        <th>Quiz</th>
+                        <th>Estado</th>
+                        <th>Inicio</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in sessions %}
+                    <tr>
+                        <td><code class="session-code">{{ s.codigo }}</code></td>
+                        <td>{{ s.quiz.titulo }}</td>
+                        <td>
+                            <span class="status-pill
+                                {% if s.estado == 'ESPERA' %}status-wait
+                                {% elif s.estado == 'EN_CURSO' %}status-live
+                                {% else %}status-done{% endif %}">
+                                {{ s.get_estado_display }}
+                            </span>
+                        </td>
+                        <td>{{ s.fecha_inicio|date:"d/m/Y H:i"|default:"—" }}</td>
+                        <td class="actions">
+                            {% if s.estado == 'ESPERA' %}
+                            <a href="{% url 'waiting_room_docente' s.pk %}" class="btn btn-sm btn-primary">Sala Espera</a>
+                            {% elif s.estado == 'EN_CURSO' %}
+                            <a href="{% url 'live_session_docente' s.pk %}" class="btn btn-sm btn-success">En Vivo</a>
+                            {% else %}
+                            <a href="{% url 'session_results' s.pk %}" class="btn btn-sm btn-secondary">Resultados</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No has creado sesiones aún.</p>
+            <a href="{% url 'create_session' %}" class="btn btn-primary">Crear primera sesión</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title %}Agregar Pregunta – QuizLive{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <a href="{% url 'quiz_builder' quiz.pk %}" class="btn btn-ghost">← Constructor</a>
+    <h1>Agregar Pregunta</h1>
+</div>
+
+<div class="card card-md">
+    <form method="post" class="form-vertical">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="enunciado">Enunciado *</label>
+            <textarea id="enunciado" name="enunciado" class="form-control" rows="3" required placeholder="Escribe la pregunta aquí..."></textarea>
+        </div>
+        <p class="hint">Después de agregar la pregunta podrás editar las opciones de respuesta (A, B, C, D).</p>
+        <div class="form-actions">
+            <a href="{% url 'quiz_builder' quiz.pk %}" class="btn btn-ghost">Cancelar</a>
+            <button type="submit" class="btn btn-primary">Agregar Pregunta</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

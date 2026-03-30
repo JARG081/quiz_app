@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block title %}Editar Pregunta – QuizLive{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <a href="{% url 'quiz_builder' quiz.pk %}" class="btn btn-ghost">← Constructor</a>
+    <h1>Editar Pregunta {{ question.orden }}</h1>
+</div>
+
+<div class="card card-md">
+    <form method="post" class="form-vertical">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="enunciado">Enunciado *</label>
+            <textarea id="enunciado" name="enunciado" class="form-control" rows="3" required>{{ question.enunciado }}</textarea>
+        </div>
+
+        <h3 class="options-title">Opciones de respuesta</h3>
+        {% for opt in options %}
+        <div class="form-group option-group">
+            <label for="texto_{{ opt.letra }}">
+                <span class="option-label-letter">{{ opt.letra }}.</span>
+                <input type="radio" name="correcta" value="{{ opt.letra }}"
+                    {% if opt.es_correcta %}checked{% endif %}> Correcta
+            </label>
+            <input type="text" id="texto_{{ opt.letra }}" name="texto_{{ opt.letra }}"
+                   class="form-control" value="{{ opt.texto }}" placeholder="Texto de la opción {{ opt.letra }}" required>
+        </div>
+        {% endfor %}
+
+        <p class="hint">Marca el radio button de la opción que es la respuesta correcta.</p>
+
+        <div class="form-actions">
+            <a href="{% url 'quiz_builder' quiz.pk %}" class="btn btn-ghost">Cancelar</a>
+            <button type="submit" class="btn btn-primary">Guardar Pregunta</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}Eliminar Quiz – QuizLive{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <a href="{% url 'quiz_list' %}" class="btn btn-ghost">← Volver</a>
+    <h1>Eliminar Quiz</h1>
+</div>
+
+<div class="card card-md danger-card">
+    <div class="danger-icon">⚠️</div>
+    <p>¿Estás seguro de que deseas eliminar el quiz <strong>{{ quiz.titulo }}</strong>?</p>
+    <p class="text-muted">Se eliminarán todas las preguntas y opciones. Esta acción no se puede deshacer.</p>
+    <form method="post" class="form-actions">
+        {% csrf_token %}
+        <a href="{% url 'quiz_list' %}" class="btn btn-ghost">Cancelar</a>
+        <button type="submit" class="btn btn-danger">Sí, Eliminar</button>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% block title %}Panel Admin – QuizLive{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🛡️ Panel de Administrador</h1>
+    <a href="{% url 'create_user' %}" class="btn btn-primary">+ Nuevo Usuario</a>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2>Usuarios del Sistema</h2>
+    </div>
+    <div class="card-body">
+        {% if users %}
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Usuario</th>
+                        <th>Email</th>
+                        <th>Rol</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in users %}
+                    <tr>
+                        <td>
+                            <span class="user-icon">
+                                {% if u.profile.role == 'ADMIN' %}🛡️{% elif u.profile.role == 'DOCENTE' %}🎓{% else %}🧑‍💻{% endif %}
+                            </span>
+                            {{ u.username }}
+                        </td>
+                        <td>{{ u.email|default:"—" }}</td>
+                        <td>
+                            <span class="role-badge role-{{ u.profile.role|lower }}">{{ u.profile.role }}</span>
+                        </td>
+                        <td class="actions">
+                            <a href="{% url 'edit_user' u.pk %}" class="btn btn-sm btn-secondary">Editar</a>
+                            <a href="{% url 'delete_user' u.pk %}" class="btn btn-sm btn-danger">Eliminar</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No hay usuarios registrados aún.</p>
+            <a href="{% url 'create_user' %}" class="btn btn-primary">Crear primer usuario</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="quick-links">
+    <a href="{% url 'course_list' %}" class="quick-link-card">
+        <span class="ql-icon">📚</span>
+        <span>Gestionar Cursos</span>
+    </a>
+</div>
+{% endblock %}

@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% block title %}Constructor – {{ quiz.titulo }} – QuizLive{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <a href="{% url 'quiz_list' %}" class="btn btn-ghost">← Mis Quizzes</a>
+    <h1>🔧 {{ quiz.titulo }}</h1>
+    <div class="header-actions">
+        <a href="{% url 'quiz_edit' quiz.pk %}" class="btn btn-secondary">Editar Info</a>
+        <form method="post" action="{% url 'toggle_publish' quiz.pk %}" style="display:inline">
+            {% csrf_token %}
+            {% if quiz.publicado %}
+            <button type="submit" class="btn btn-warning">Despublicar</button>
+            {% else %}
+            <button type="submit" class="btn btn-success" {% if not can_publish %}disabled title="Necesita entre 5 y 20 preguntas con 4 opciones y 1 correcta"{% endif %}>
+                Publicar
+            </button>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+<div class="builder-status">
+    <span class="status-pill {% if quiz.publicado %}status-published{% else %}status-draft{% endif %}">
+        {% if quiz.publicado %}✅ Publicado{% else %}📋 Borrador{% endif %}
+    </span>
+    <span class="status-info">{{ total }} preguntas | {{ quiz.tiempo_por_pregunta }}s por pregunta | Curso: {{ quiz.course.nombre }}</span>
+    {% if not can_publish and not quiz.publicado %}
+    <span class="status-warning">⚠️ Necesitas entre 5 y 20 preguntas para publicar (tienes {{ total }})</span>
+    {% endif %}
+</div>
+
+<div class="builder-container">
+    <!-- Add Question -->
+    {% if not quiz.publicado %}
+    <div class="card add-question-card">
+        <h3>➕ Agregar Pregunta</h3>
+        <form method="post" action="{% url 'add_question' quiz.pk %}" class="inline-form">
+            {% csrf_token %}
+            <input type="text" name="enunciado" class="form-control" placeholder="Escribe el enunciado de la pregunta..." required>
+            <button type="submit" class="btn btn-primary">Agregar</button>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- Questions List -->
+    {% if questions %}
+    <div class="questions-list">
+        {% for q in questions %}
+        <div class="question-card">
+            <div class="question-header">
+                <span class="question-number">P{{ q.orden }}</span>
+                <span class="question-text">{{ q.enunciado }}</span>
+                {% if not quiz.publicado %}
+                <div class="question-actions">
+                    <a href="{% url 'edit_question' quiz.pk q.pk %}" class="btn btn-sm btn-secondary">Editar</a>
+                    <form method="post" action="{% url 'delete_question' quiz.pk q.pk %}" style="display:inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('¿Eliminar esta pregunta?')">✕</button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+            <div class="options-row">
+                {% for opt in q.options.all %}
+                <div class="option-chip {% if opt.es_correcta %}option-correct{% endif %}">
+                    <strong>{{ opt.letra }}.</strong>
+                    {% if opt.texto %}{{ opt.texto }}{% else %}<em class="text-muted">Sin texto</em>{% endif %}
+                    {% if opt.es_correcta %}<span class="correct-mark">✓</span>{% endif %}
+                </div>
+                {% empty %}
+                <span class="text-muted">Sin opciones — <a href="{% url 'edit_question' quiz.pk q.pk %}">editar</a></span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>Aún no hay preguntas. Agrega la primera arriba.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

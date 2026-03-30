@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+{% block title %}Quiz en Vivo – QuizLive{% endblock %}
+
+{% block content %}
+<div class="live-estudiante-layout" id="app">
+    <!-- Loading state -->
+    <div id="state-waiting" class="live-state-panel">
+        <div class="pulse-ring"></div>
+        <h2>Esperando pregunta…</h2>
+    </div>
+
+    <!-- Active question -->
+    <div id="state-question" class="live-state-panel hidden">
+        <div class="question-panel">
+            <div class="live-timer-bar">
+                <div class="timer-fill" id="timer-fill"></div>
+                <span id="timer-text">--</span>
+            </div>
+            <div class="question-header-live">
+                <span id="q-number" class="q-number">Pregunta —</span>
+            </div>
+            <h2 id="q-text" class="q-text"></h2>
+            <div id="options-grid" class="options-grid-4"></div>
+            <p id="answered-msg" class="answered-msg hidden">✅ Respuesta enviada. Esperando al docente…</p>
+        </div>
+    </div>
+
+    <!-- Finished -->
+    <div id="state-finished" class="live-state-panel hidden">
+        <h2>🏁 Quiz finalizado</h2>
+        <a id="results-link" href="#" class="btn btn-primary btn-lg">Ver Resultados</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const SESSION_ID = '{{ session.pk }}';
+const CSRF = '{{ csrf_token }}';
+const STATE_URL = `/sessions/${SESSION_ID}/api/state/`;
+const ANSWER_URL = `/sessions/${SESSION_ID}/answer/`;
+const RESULTS_URL = `/sessions/${SESSION_ID}/results/`;
+const DASHBOARD_URL = `/estudiante/dashboard/`;
+
+let lastQuestionId = null;
+let answered = false;
+let maxTime = 30;
+
+function show(id) {
+    ['state-waiting','state-question','state-finished'].forEach(s => {
+        document.getElementById(s).classList.toggle('hidden', s !== id);
+    });
+}
+
+async function poll() {
+    try {
+        const res = await fetch(STATE_URL);
+        const data = await res.json();
+
+        if (data.student_expulsado) { window.location.href = DASHBOARD_URL; return; }
+
+        if (data.estado === 'FINALIZADO') {
+            document.getElementById('results-link').href = RESULTS_URL;
+            show('state-finished');
+            return;
+        }
+
+        if (data.estado !== 'EN_CURSO' || !data.pregunta) { show('state-waiting'); return; }
+
+        const q = data.pregunta;
+        const timeLeft = data.tiempo_restante;
+
+        // New question arrived
+        if (q.id !== lastQuestionId) {
+            lastQuestionId = q.id;
+            answered = data.student_answered;
+            maxTime = timeLeft;
+            document.getElementById('q-number').textContent = `Pregunta ${q.orden} de ${data.total_preguntas}`;
+            document.getElementById('q-text').textContent = q.enunciado;
+
+            const colors = ['option-a','option-b','option-c','option-d'];
+            document.getElementById('options-grid').innerHTML = q.opciones.map((o, i) =>
+                `<button class="option-btn ${colors[i]}" id="opt-${o.id}"
+                    onclick="submitAnswer(${o.id})" ${answered ? 'disabled' : ''}>
+                    <strong>${o.letra}</strong> ${o.texto}
+                 </button>`
+            ).join('');
+
+            document.getElementById('answered-msg').classList.toggle('hidden', !answered);
+        }
+
+        // Timer
+        const pct = maxTime > 0 ? (timeLeft / maxTime * 100) : 0;
+        document.getElementById('timer-fill').style.width = pct + '%';
+        document.getElementById('timer-text').textContent = timeLeft + 's';
+        document.getElementById('timer-fill').className =
+            'timer-fill' + (timeLeft <= 5 ? ' timer-urgent' : '');
+
+        // Mark answered
+        if (data.student_answered && !answered) {
+            answered = true;
+            document.querySelectorAll('.option-btn').forEach(b => b.disabled = true);
+            document.getElementById('answered-msg').classList.remove('hidden');
+        }
+
+        show('state-question');
+    } catch(e) { console.error(e); }
+}
+
+async function submitAnswer(optionId) {
+    if (answered) return;
+    document.querySelectorAll('.option-btn').forEach(b => b.disabled = true);
+    answered = true;
+
+    const body = new URLSearchParams({option_id: optionId});
+    const res = await fetch(ANSWER_URL, {
+        method: 'POST',
+        headers: {'X-CSRFToken': CSRF},
+        body: body
+    });
+    const data = await res.json();
+    document.getElementById('answered-msg').classList.remove('hidden');
+
+    if (data.ok) {
+        const btn = document.getElementById(`opt-${optionId}`);
+        if (btn) btn.classList.add(data.es_correcta ? 'correct' : 'incorrect');
+    }
+}
+
+poll();
+setInterval(poll, 1500);
+</script>
+{% endblock %}

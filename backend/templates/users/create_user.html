@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block title %}Crear Usuario – QuizLive{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <a href="{% url 'admin_dashboard' %}" class="btn btn-ghost">← Volver</a>
+    <h1>Crear Usuario</h1>
+</div>
+
+<div class="card card-md">
+    <form method="post" class="form-vertical">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="username">Nombre de usuario *</label>
+            <input type="text" id="username" name="username" class="form-control" required>
+        </div>
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" class="form-control">
+        </div>
+        <div class="form-group">
+            <label for="password">Contraseña *</label>
+            <input type="password" id="password" name="password" class="form-control" required>
+        </div>
+        <div class="form-group">
+            <label for="role">Rol *</label>
+            <select id="role" name="role" class="form-control">
+                <option value="ESTUDIANTE">Estudiante</option>
+                <option value="DOCENTE">Docente</option>
+                <option value="ADMIN">Admin</option>
+            </select>
+        </div>
+        <div class="form-actions">
+            <a href="{% url 'admin_dashboard' %}" class="btn btn-ghost">Cancelar</a>
+            <button type="submit" class="btn btn-primary">Crear Usuario</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

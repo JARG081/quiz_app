@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}Eliminar Usuario – QuizLive{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <a href="{% url 'admin_dashboard' %}" class="btn btn-ghost">← Volver</a>
+    <h1>Eliminar Usuario</h1>
+</div>
+
+<div class="card card-md danger-card">
+    <div class="danger-icon">⚠️</div>
+    <p>¿Estás seguro de que deseas eliminar al usuario <strong>{{ target.username }}</strong>?</p>
+    <p class="text-muted">Esta acción no se puede deshacer.</p>
+    <form method="post" class="form-actions">
+        {% csrf_token %}
+        <a href="{% url 'admin_dashboard' %}" class="btn btn-ghost">Cancelar</a>
+        <button type="submit" class="btn btn-danger">Sí, Eliminar</button>
+    </form>
+</div>
+{% endblock %}
