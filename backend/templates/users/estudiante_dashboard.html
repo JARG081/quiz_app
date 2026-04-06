@@ -35,17 +35,6 @@
     </div>
 </div>
 
-<div class="join-session-banner">
-    <div class="join-banner-content">
-        <h2>¿Hay una sesión en vivo?</h2>
-        <p>Ingresa el código que te dio tu docente para unirte al quiz.</p>
-        <form action="{% url 'join_session' %}" method="post" class="inline-form">
-            {% csrf_token %}
-            <input type="text" name="codigo" class="form-control code-input" placeholder="ABC123" maxlength="8" style="text-transform:uppercase">
-            <button type="submit" class="btn btn-primary">Unirse</button>
-        </form>
-    </div>
-</div>
 
 <div class="quick-links">
     <a href="{% url 'student_stats' %}" class="quick-link-card">

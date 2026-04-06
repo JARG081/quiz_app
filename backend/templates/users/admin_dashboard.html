@@ -7,52 +7,60 @@
     <a href="{% url 'create_user' %}" class="btn btn-primary">+ Nuevo Usuario</a>
 </div>
 
-<div class="card">
-    <div class="card-header">
-        <h2>Usuarios del Sistema</h2>
-    </div>
-    <div class="card-body">
-        {% if users %}
-        <div class="table-responsive">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Usuario</th>
-                        <th>Email</th>
-                        <th>Rol</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for u in users %}
-                    <tr>
-                        <td>
-                            <span class="user-icon">
-                                {% if u.profile.role == 'ADMIN' %}🛡️{% elif u.profile.role == 'DOCENTE' %}🎓{% else %}🧑‍💻{% endif %}
-                            </span>
-                            {{ u.username }}
-                        </td>
-                        <td>{{ u.email|default:"—" }}</td>
-                        <td>
-                            <span class="role-badge role-{{ u.profile.role|lower }}">{{ u.profile.role }}</span>
-                        </td>
-                        <td class="actions">
-                            <a href="{% url 'edit_user' u.pk %}" class="btn btn-sm btn-secondary">Editar</a>
-                            <a href="{% url 'delete_user' u.pk %}" class="btn btn-sm btn-danger">Eliminar</a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+{% if total > 0 %}
+    {% for grupo in grupos %}
+    <div class="card" style="margin-bottom: 30px; border-top: 4px solid var(--primary);">
+        <div class="card-header">
+            <h2>{{ grupo.icon }} {{ grupo.titulo }} <span class="badge" style="background:var(--bg-hover); color:var(--text); float:right;">{{ grupo.lista|length }}</span></h2>
         </div>
-        {% else %}
-        <div class="empty-state">
-            <p>No hay usuarios registrados aún.</p>
-            <a href="{% url 'create_user' %}" class="btn btn-primary">Crear primer usuario</a>
+        <div class="card-body" style="padding:0;">
+            {% if grupo.lista %}
+            <div class="table-responsive">
+                <table class="table" style="margin:0;">
+                    <thead>
+                        <tr>
+                            <th>Usuario</th>
+                            <th>Email</th>
+                            <th>Rol</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for u in grupo.lista %}
+                        <tr>
+                            <td>
+                                <span class="user-icon">{{ grupo.icon }}</span>
+                                {{ u.username }}
+                            </td>
+                            <td>{{ u.email|default:"—" }}</td>
+                            <td>
+                                <span class="role-badge role-{{ u.profile.role|lower }}">{{ u.profile.role }}</span>
+                            </td>
+                            <td class="actions">
+                                <a href="{% url 'edit_user' u.pk %}" class="btn btn-sm btn-secondary">Editar</a>
+                                <a href="{% url 'delete_user' u.pk %}" class="btn btn-sm btn-danger">Eliminar</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted" style="padding: 20px; text-align:center;">No hay usuarios en este rol.</p>
+            {% endif %}
         </div>
-        {% endif %}
     </div>
-</div>
+    {% endfor %}
+{% else %}
+    <div class="card">
+        <div class="card-body">
+            <div class="empty-state" style="padding:40px; text-align:center;">
+                <p>No hay usuarios registrados aún.</p>
+                <a href="{% url 'create_user' %}" class="btn btn-primary">Crear primer usuario</a>
+            </div>
+        </div>
+    </div>
+{% endif %}
 
 <div class="quick-links">
     <a href="{% url 'course_list' %}" class="quick-link-card">

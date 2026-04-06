@@ -7,33 +7,95 @@
     <h1>Editar Pregunta {{ question.orden }}</h1>
 </div>
 
-<div class="card card-md">
-    <form method="post" class="form-vertical">
+<div class="card add-question-card" style="padding: 20px; border: 2px dashed var(--border);">
+    <form method="post" class="builder-form">
         {% csrf_token %}
-        <div class="form-group">
-            <label for="enunciado">Enunciado *</label>
-            <textarea id="enunciado" name="enunciado" class="form-control" rows="3" required>{{ question.enunciado }}</textarea>
+        <div class="form-group" style="margin-bottom: 20px;">
+            <label style="font-weight:bold;">Enunciado de la Pregunta:</label>
+            <textarea name="enunciado" class="form-control" rows="2" required style="font-size: 1.1rem; padding: 12px;">{{ question.enunciado }}</textarea>
         </div>
 
-        <h3 class="options-title">Opciones de respuesta</h3>
-        {% for opt in options %}
-        <div class="form-group option-group">
-            <label for="texto_{{ opt.letra }}">
-                <span class="option-label-letter">{{ opt.letra }}.</span>
-                <input type="radio" name="correcta" value="{{ opt.letra }}"
-                    {% if opt.es_correcta %}checked{% endif %}> Correcta
+        <div class="form-group" style="margin-bottom: 20px; background: var(--bg-hover); padding: 15px; border-radius: 8px;">
+            <label style="font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:10px; margin:0;">
+                <input type="checkbox" name="es_vf" id="es_vf_toggle" onchange="toggleVF()" style="width:20px; height:20px;" {% if options|length == 2 %}checked{% endif %}>
+                <span>Convertir en pregunta de Verdadero / Falso</span>
             </label>
-            <input type="text" id="texto_{{ opt.letra }}" name="texto_{{ opt.letra }}"
-                   class="form-control" value="{{ opt.texto }}" placeholder="Texto de la opción {{ opt.letra }}" required>
         </div>
-        {% endfor %}
 
-        <p class="hint">Marca el radio button de la opción que es la respuesta correcta.</p>
+        <div class="options-grid-edit" id="options-inputs" style="display:grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+            {% for opt in options %}
+            <div class="input-option-box {% if opt.letra == 'C' or opt.letra == 'D' %}opt-cd{% endif %}" style="border: 2px solid var(--border); padding: 15px; border-radius: 8px; background:var(--bg-card);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <strong style="font-size:1.2rem; color:var(--primary);">{{ opt.letra }}.</strong>
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px;">
+                        <input type="radio" name="correcta" value="{{ opt.letra }}" required {% if opt.es_correcta %}checked{% endif %}> Es Correcta
+                    </label>
+                </div>
+                <input type="text" name="opt_{{ opt.letra }}" id="opt_{{ opt.letra }}" class="form-control" required value="{{ opt.texto }}" placeholder="Escribe la opción {{ opt.letra }}">
+            </div>
+            {% endfor %}
+            
+            {% if options|length == 2 %}
+            <!-- C and D inputs hidden, but strictly needed if toggled back to Multiple -->
+            <div class="input-option-box opt-cd" style="border: 2px solid var(--border); padding: 15px; border-radius: 8px; background:var(--bg-card); display:none;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <strong style="font-size:1.2rem; color:var(--primary);">C.</strong>
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px;"><input type="radio" name="correcta" value="C" required> Es Correcta</label>
+                </div>
+                <input type="text" name="opt_C" id="opt_C" class="form-control" placeholder="Escribe la opción C" value="" disabled>
+            </div>
+            <div class="input-option-box opt-cd" style="border: 2px solid var(--border); padding: 15px; border-radius: 8px; background:var(--bg-card); display:none;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <strong style="font-size:1.2rem; color:var(--primary);">D.</strong>
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px;"><input type="radio" name="correcta" value="D" required> Es Correcta</label>
+                </div>
+                <input type="text" name="opt_D" id="opt_D" class="form-control" placeholder="Escribe la opción D" value="" disabled>
+            </div>
+            {% endif %}
+        </div>
 
-        <div class="form-actions">
-            <a href="{% url 'quiz_builder' quiz.pk %}" class="btn btn-ghost">Cancelar</a>
-            <button type="submit" class="btn btn-primary">Guardar Pregunta</button>
+        <div style="display:flex; gap:15px;">
+            <a href="{% url 'quiz_builder' quiz.pk %}" class="btn btn-secondary btn-square" style="border-radius:8px; padding:15px; flex:1; text-align:center;">Cancelar</a>
+            <button type="submit" class="btn btn-primary btn-square" style="border-radius:8px; padding:15px; flex:2; font-size:1.1rem;">Actualizar Pregunta</button>
         </div>
     </form>
 </div>
+
+<script>
+    function toggleVF() {
+        const isVF = document.getElementById('es_vf_toggle').checked;
+        const boxesCD = document.querySelectorAll('.opt-cd');
+        const inputA = document.getElementById('opt_A');
+        const inputB = document.getElementById('opt_B');
+        
+        if (isVF) {
+            boxesCD.forEach(b => {
+                b.style.display = 'none';
+                b.querySelectorAll('input').forEach(i => { i.required = false; i.disabled = true; });
+            });
+            inputA.value = 'Verdadero';
+            inputA.readOnly = true;
+            inputA.style.background = 'var(--bg-body)';
+            inputB.value = 'Falso';
+            inputB.readOnly = true;
+            inputB.style.background = 'var(--bg-body)';
+            if (!document.querySelector('input[name="correcta"]:checked')) {
+                document.querySelector('input[name="correcta"][value="A"]').checked = true;
+            }
+        } else {
+            boxesCD.forEach(b => {
+                b.style.display = 'block';
+                b.querySelectorAll('input[type="text"]').forEach(i => { i.required = true; i.disabled = false; });
+                b.querySelectorAll('input[type="radio"]').forEach(i => i.disabled = false);
+            });
+            inputA.readOnly = false;
+            inputA.style.background = '';
+            inputB.readOnly = false;
+            inputB.style.background = '';
+        }
+    }
+    
+    // Ejecutar al inicio por si entra ya en modo True/False
+    toggleVF();
+</script>
 {% endblock %}

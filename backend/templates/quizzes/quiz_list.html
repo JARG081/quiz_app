@@ -4,41 +4,70 @@
 {% block content %}
 <div class="page-header">
     <h1>📝 Mis Quizzes</h1>
-    <a href="{% url 'quiz_create' %}" class="btn btn-primary">+ Nuevo Quiz</a>
+    <a href="{% url 'quiz_create' %}" class="btn btn-primary {% if active_session %}disabled{% endif %}">+ Nuevo Quiz</a>
 </div>
 
-<div class="card">
-    <div class="card-body">
-        {% if quizzes %}
-        <div class="quiz-grid">
-            {% for quiz in quizzes %}
-            <div class="quiz-card {% if quiz.publicado %}published{% endif %}">
-                <div class="quiz-card-header">
-                    <span class="quiz-status">
-                        {% if quiz.publicado %}✅ Publicado{% else %}📋 Borrador{% endif %}
-                    </span>
-                    <span class="quiz-course-tag">{{ quiz.course.nombre }}</span>
-                </div>
-                <h3>{{ quiz.titulo }}</h3>
-                <p class="text-muted">{{ quiz.descripcion|truncatechars:80 }}</p>
-                <div class="quiz-meta">
-                    <span>📊 {{ quiz.total_preguntas }} preguntas</span>
-                    <span>⏱️ {{ quiz.tiempo_por_pregunta }}s/pregunta</span>
-                </div>
-                <div class="quiz-actions">
-                    <a href="{% url 'quiz_builder' quiz.pk %}" class="btn btn-sm btn-primary">Construir</a>
-                    <a href="{% url 'quiz_edit' quiz.pk %}" class="btn btn-sm btn-secondary">Editar</a>
-                    <a href="{% url 'quiz_delete' quiz.pk %}" class="btn btn-sm btn-danger">Eliminar</a>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <div class="empty-state">
-            <p>No has creado quizzes aún.</p>
-            <a href="{% url 'quiz_create' %}" class="btn btn-primary">Crear primer quiz</a>
-        </div>
-        {% endif %}
-    </div>
+{% if active_session %}
+<div class="alert alert-warning" style="background:#fff3cd; color:#856404; padding:15px; border-radius:8px; margin-bottom:20px; font-weight:500; display:flex; justify-content:space-between; align-items:center;">
+    <span>⚠️ Tienes una Sala Activa de un Quiz anterior. Termínala antes de crear, editar o iniciar otra.</span>
+    <a href="{% if active_session.estado == 'EN_CURSO' %}{% url 'live_session_docente' active_session.pk %}{% else %}{% url 'waiting_room_docente' active_session.pk %}{% endif %}" class="btn btn-sm btn-primary">Ir a mi Sala Activa</a>
 </div>
+{% endif %}
+
+{% if courses_dict %}
+    {% for curso, q_list in courses_dict.items %}
+    <div class="card" style="margin-bottom: 30px; border-top: 4px solid var(--primary);">
+        <div class="card-header">
+            <h2 style="display:flex; align-items:center; gap:10px;">📚 {{ curso.nombre }} <span class="badge" style="background:var(--bg-hover); color:var(--text); font-size:14px; padding:5px 10px; border-radius:20px;">{{ q_list|length }} Quizzes</span></h2>
+        </div>
+        <div class="card-body">
+            <div class="quiz-grid">
+                {% for quiz in q_list %}
+                <div class="quiz-card {% if quiz.publicado %}published{% endif %}">
+                    <div class="quiz-card-header">
+                        <span class="quiz-status">
+                            {% if quiz.publicado %}✅ Publicado{% else %}📋 Borrador{% endif %}
+                        </span>
+                    </div>
+                    <h3>{{ quiz.titulo }}</h3>
+                    <p class="text-muted">{{ quiz.descripcion|truncatechars:80 }}</p>
+                    <div class="quiz-meta">
+                        <span>📊 {{ quiz.total_preguntas }} preguntas</span>
+                        <span>⏱️ {{ quiz.tiempo_por_pregunta }}s/pregunta</span>
+                    </div>
+                    <div class="quiz-actions" style="margin-top:15px; display:flex; flex-direction:column; gap:8px;">
+                        {% if quiz.publicado %}
+                            <form method="POST" action="{% url 'create_session' %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="quiz_id" value="{{ quiz.pk }}">
+                                <button type="submit" class="btn btn-success" style="width:100%;" {% if active_session %}disabled title="Tienes una sala activa"{% endif %}>
+                                    ▶ Iniciar Sala
+                                </button>
+                            </form>
+                        {% else %}
+                            <button class="btn btn-ghost" style="width:100%; opacity:0.5;" disabled>Aún no publicado</button>
+                        {% endif %}
+                        
+                        <div style="display:flex; gap:8px; width:100%;">
+                            <a href="{% url 'quiz_builder' quiz.pk %}" class="btn btn-sm btn-primary {% if active_session %}disabled{% endif %}" style="flex:1;">Construir</a>
+                            <a href="{% url 'quiz_edit' quiz.pk %}" class="btn btn-sm btn-secondary {% if active_session %}disabled{% endif %}" style="flex:1;">Editar</a>
+                            <a href="{% url 'quiz_delete' quiz.pk %}" class="btn btn-sm btn-danger {% if active_session %}disabled{% endif %}" style="flex:1;">Borrar</a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="card">
+        <div class="card-body">
+            <div class="empty-state">
+                <p>No tienes quizzes aquí aún.</p>
+                <a href="{% url 'quiz_create' %}" class="btn btn-primary {% if active_session %}disabled{% endif %}">+ Crear primer quiz</a>
+            </div>
+        </div>
+    </div>
+{% endif %}
 {% endblock %}

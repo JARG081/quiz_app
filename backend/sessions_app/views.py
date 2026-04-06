@@ -42,29 +42,32 @@ def _auto_advance_if_needed(session):
 
 @role_required('DOCENTE')
 def create_session(request):
-    from courses.models import CourseTeacher
-    mis_cursos = [ct.course for ct in CourseTeacher.objects.filter(teacher=request.user)]
-    quizzes_disponibles = Quiz.objects.filter(
-        course__in=mis_cursos, publicado=True
-    ).select_related('course')
+    # Rule: One active session per teacher
+    active_session = QuizSession.objects.filter(
+        docente=request.user, estado__in=[QuizSession.ESPERA, QuizSession.EN_CURSO]
+    ).first()
+    
+    if active_session:
+        messages.warning(request, 'Ya tienes una sesión activa. Termínala primero para empezar un nuevo Quiz.')
+        if active_session.estado == QuizSession.EN_CURSO:
+            return redirect('live_session_docente', session_id=active_session.pk)
+        return redirect('waiting_room_docente', session_id=active_session.pk)
 
     if request.method == 'POST':
+        from courses.models import CourseTeacher
         quiz_id = request.POST.get('quiz_id')
         quiz = get_object_or_404(Quiz, pk=quiz_id, publicado=True)
+        
+        mis_cursos = [ct.course for ct in CourseTeacher.objects.filter(teacher=request.user)]
         if quiz.course not in mis_cursos:
             messages.error(request, 'No tienes acceso a ese quiz.')
-            return redirect('session_list')
+            return redirect('quiz_list')
 
         session = QuizSession.objects.create(quiz=quiz, docente=request.user)
         messages.success(request, f'Sesión creada con código: {session.codigo}')
-        return redirect('waiting_room', session_id=session.pk)
-
-    # Also list past sessions
-    my_sessions = QuizSession.objects.filter(docente=request.user).select_related('quiz')[:20]
-    return render(request, 'sessions_app/create_session.html', {
-        'quizzes': quizzes_disponibles,
-        'my_sessions': my_sessions,
-    })
+        return redirect('waiting_room_docente', session_id=session.pk)
+    
+    return redirect('quiz_list')
 
 
 @role_required('DOCENTE')
@@ -209,7 +212,19 @@ def session_state_api(request, session_id):
         'permitir_ingreso': session.permitir_ingreso,
         'student_answered': student_answered,
         'student_expulsado': student_expulsado,
+        'mostrando_resultados': session.mostrando_resultados,
     }
+
+    if session.mostrando_resultados and student_answered and pregunta_obj:
+        user_ans = LiveAnswer.objects.filter(session=session, student=request.user, question=pregunta_obj).select_related('option').first()
+        if user_ans:
+            correct_opts = [o.letra for o in pregunta_obj.options.filter(es_correcta=True)]
+            data['student_result'] = {
+                'es_correcta': user_ans.option.es_correcta,
+                'puntaje': user_ans.puntaje,
+                'letra_marcada': user_ans.option.letra,
+                'correct_opts': correct_opts
+            }
 
     if pregunta_obj:
         data['pregunta'] = {
@@ -414,7 +429,7 @@ def submit_answer(request, session_id):
         session=session, student=request.user,
         question=pregunta_obj, option=option, puntaje=puntaje
     )
-    return JsonResponse({'ok': True, 'es_correcta': option.es_correcta})
+    return JsonResponse({'ok': True})
 
 
 def leaderboard_api(request, session_id):

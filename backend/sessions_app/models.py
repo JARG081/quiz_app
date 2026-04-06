@@ -18,6 +18,7 @@ class QuizSession(models.Model):
     docente = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sessions_docente')
     estado = models.CharField(max_length=15, choices=ESTADO_CHOICES, default=ESPERA)
     permitir_ingreso = models.BooleanField(default=True)
+    mostrando_resultados = models.BooleanField(default=False)
     pregunta_actual = models.IntegerField(default=0)  # 0 = no iniciado, 1..N = index
     ultima_pregunta_inicio = models.DateTimeField(null=True, blank=True)
     fecha_inicio = models.DateTimeField(null=True, blank=True)

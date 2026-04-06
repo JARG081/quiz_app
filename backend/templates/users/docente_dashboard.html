@@ -6,7 +6,7 @@
     <h1>🎓 Panel del Docente</h1>
     <div class="header-actions">
         <a href="{% url 'quiz_list' %}" class="btn btn-primary">Mis Quizzes</a>
-        <a href="{% url 'create_session' %}" class="btn btn-secondary">Nueva Sesión</a>
+        <a href="{% url 'quiz_list' %}" class="btn btn-secondary">Nueva Sesión</a>
     </div>
 </div>
 
@@ -29,7 +29,7 @@
                 <p class="text-muted">{{ ct.course.descripcion|truncatechars:80 }}</p>
                 <div class="course-actions">
                     <a href="{% url 'quiz_list' %}?course={{ ct.course.pk }}" class="btn btn-sm btn-primary">Ver Quizzes</a>
-                    <a href="{% url 'create_session' %}" class="btn btn-sm btn-secondary">Sesión</a>
+                    <a href="{% url 'quiz_list' %}?course={{ ct.course.pk }}" class="btn btn-sm btn-secondary">Sala</a>
                 </div>
             </div>
             {% endfor %}

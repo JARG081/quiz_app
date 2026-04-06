@@ -61,7 +61,12 @@ def logout_view(request):
 @role_required('ADMIN')
 def admin_dashboard(request):
     users = User.objects.select_related('profile').exclude(is_superuser=True).order_by('username')
-    return render(request, 'users/admin_dashboard.html', {'users': users})
+    grupos = [
+        {'titulo': 'Admins del Sistema', 'lista': [u for u in users if u.profile.role == 'ADMIN'], 'icon': '🛡️'},
+        {'titulo': 'Docentes', 'lista': [u for u in users if u.profile.role == 'DOCENTE'], 'icon': '🎓'},
+        {'titulo': 'Estudiantes', 'lista': [u for u in users if u.profile.role == 'ESTUDIANTE'], 'icon': '🧑‍💻'},
+    ]
+    return render(request, 'users/admin_dashboard.html', {'grupos': grupos, 'total': len(users)})
 
 
 @role_required('ADMIN')

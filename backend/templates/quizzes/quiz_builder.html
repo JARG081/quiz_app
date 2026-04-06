@@ -33,45 +33,127 @@
 <div class="builder-container">
     <!-- Add Question -->
     {% if not quiz.publicado %}
-    <div class="card add-question-card">
-        <h3>➕ Agregar Pregunta</h3>
-        <form method="post" action="{% url 'add_question' quiz.pk %}" class="inline-form">
+    <div class="card add-question-card" style="padding: 20px; margin-bottom: 40px; border: 2px dashed var(--border);">
+        <h3 style="text-align:center; margin-bottom: 20px;">➕ Agregar Nueva Pregunta</h3>
+        <form method="post" action="{% url 'add_question' quiz.pk %}" class="builder-form">
             {% csrf_token %}
-            <input type="text" name="enunciado" class="form-control" placeholder="Escribe el enunciado de la pregunta..." required>
-            <button type="submit" class="btn btn-primary">Agregar</button>
+            
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label style="font-weight:bold;">Enunciado de la Pregunta:</label>
+                <input type="text" name="enunciado" class="form-control" placeholder="¿Cuál es la capital de...?" required style="font-size: 1.1rem; padding: 12px;">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 20px; background: var(--bg-hover); padding: 15px; border-radius: 8px;">
+                <label style="font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:10px; margin:0;">
+                    <input type="checkbox" name="es_vf" id="es_vf_toggle" onchange="toggleVF()" style="width:20px; height:20px;">
+                    <span>Convertir en pregunta de Verdadero / Falso</span>
+                </label>
+            </div>
+
+            <div class="options-grid-edit" id="options-inputs" style="display:grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                <!-- A -->
+                <div class="input-option-box" style="border: 2px solid var(--border); padding: 15px; border-radius: 8px; background:var(--bg-card);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <strong style="font-size:1.2rem; color:var(--primary);">A.</strong>
+                        <label style="cursor:pointer; display:flex; align-items:center; gap:5px;"><input type="radio" name="correcta" value="A" required checked> Es Correcta</label>
+                    </div>
+                    <input type="text" name="opt_A" id="opt_A" class="form-control" required placeholder="Escribe la opción A">
+                </div>
+                <!-- B -->
+                <div class="input-option-box" style="border: 2px solid var(--border); padding: 15px; border-radius: 8px; background:var(--bg-card);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <strong style="font-size:1.2rem; color:var(--primary);">B.</strong>
+                        <label style="cursor:pointer; display:flex; align-items:center; gap:5px;"><input type="radio" name="correcta" value="B" required> Es Correcta</label>
+                    </div>
+                    <input type="text" name="opt_B" id="opt_B" class="form-control" required placeholder="Escribe la opción B">
+                </div>
+                <!-- C -->
+                <div class="input-option-box opt-cd" style="border: 2px solid var(--border); padding: 15px; border-radius: 8px; background:var(--bg-card);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <strong style="font-size:1.2rem; color:var(--primary);">C.</strong>
+                        <label style="cursor:pointer; display:flex; align-items:center; gap:5px;"><input type="radio" name="correcta" value="C" required> Es Correcta</label>
+                    </div>
+                    <input type="text" name="opt_C" id="opt_C" class="form-control" required placeholder="Escribe la opción C">
+                </div>
+                <!-- D -->
+                <div class="input-option-box opt-cd" style="border: 2px solid var(--border); padding: 15px; border-radius: 8px; background:var(--bg-card);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <strong style="font-size:1.2rem; color:var(--primary);">D.</strong>
+                        <label style="cursor:pointer; display:flex; align-items:center; gap:5px;"><input type="radio" name="correcta" value="D" required> Es Correcta</label>
+                    </div>
+                    <input type="text" name="opt_D" id="opt_D" class="form-control" required placeholder="Escribe la opción D">
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-square" style="width: 100%; border-radius:8px; padding:15px; font-size:1.1rem;">Guardar Pregunta</button>
         </form>
     </div>
+
+    <script>
+    function toggleVF() {
+        const isVF = document.getElementById('es_vf_toggle').checked;
+        const boxesCD = document.querySelectorAll('.opt-cd');
+        const inputA = document.getElementById('opt_A');
+        const inputB = document.getElementById('opt_B');
+        
+        if (isVF) {
+            boxesCD.forEach(b => {
+                b.style.display = 'none';
+                b.querySelectorAll('input').forEach(i => i.required = false);
+            });
+            inputA.value = 'Verdadero';
+            inputA.readOnly = true;
+            inputA.style.background = 'var(--bg-body)';
+            inputB.value = 'Falso';
+            inputB.readOnly = true;
+            inputB.style.background = 'var(--bg-body)';
+            document.querySelector('input[name="correcta"][value="A"]').checked = true;
+        } else {
+            boxesCD.forEach(b => {
+                b.style.display = 'block';
+                b.querySelectorAll('input[type="text"]').forEach(i => i.required = true);
+            });
+            inputA.readOnly = false;
+            inputA.style.background = '';
+            inputA.value = '';
+            inputB.readOnly = false;
+            inputB.style.background = '';
+            inputB.value = '';
+        }
+    }
+    </script>
     {% endif %}
 
     <!-- Questions List -->
     {% if questions %}
-    <div class="questions-list">
+    <div class="questions-list" style="display:flex; flex-direction:column; gap:30px;">
         {% for q in questions %}
-        <div class="question-card">
-            <div class="question-header">
-                <span class="question-number">P{{ q.orden }}</span>
-                <span class="question-text">{{ q.enunciado }}</span>
-                {% if not quiz.publicado %}
-                <div class="question-actions">
-                    <a href="{% url 'edit_question' quiz.pk q.pk %}" class="btn btn-sm btn-secondary">Editar</a>
-                    <form method="post" action="{% url 'delete_question' quiz.pk q.pk %}" style="display:inline">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('¿Eliminar esta pregunta?')">✕</button>
-                    </form>
-                </div>
-                {% endif %}
+        <div class="question-card" style="padding: 30px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 15px rgba(0,0,0,0.05); background: var(--bg-card);">
+            <div class="question-header" style="text-align:center; margin-bottom: 25px;">
+                <span class="question-number" style="display:inline-block; padding:5px 15px; background:var(--primary); color:white; border-radius:20px; font-weight:bold; margin-bottom: 10px;">Pregunta {{ q.orden }}</span>
+                <h3 class="question-text" style="font-size: 1.5rem; margin:0; line-height:1.4;">{{ q.enunciado }}</h3>
             </div>
-            <div class="options-row">
+            
+            <div class="options-grid-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px;">
                 {% for opt in q.options.all %}
-                <div class="option-chip {% if opt.es_correcta %}option-correct{% endif %}">
-                    <strong>{{ opt.letra }}.</strong>
-                    {% if opt.texto %}{{ opt.texto }}{% else %}<em class="text-muted">Sin texto</em>{% endif %}
-                    {% if opt.es_correcta %}<span class="correct-mark">✓</span>{% endif %}
+                <div class="option-chip {% if opt.es_correcta %}option-correct{% endif %}" style="margin:0; text-align:center; padding: 20px; border-radius:8px; display:flex; flex-direction:column; justify-content:center; align-items:center; border: 2px solid {% if opt.es_correcta %}#4CAF50{% else %}var(--border){% endif %};">
+                    <span style="font-size:1.2rem;"><strong>{{ opt.letra }}.</strong> {{ opt.texto }}</span>
+                    {% if opt.es_correcta %}<span class="correct-mark" style="margin-top:10px; font-weight:bold; color:#4CAF50; display:inline-block; background:rgba(76,175,80,0.1); padding:4px 10px; border-radius:12px;">✓ Opción Correcta</span>{% endif %}
                 </div>
                 {% empty %}
-                <span class="text-muted">Sin opciones — <a href="{% url 'edit_question' quiz.pk q.pk %}">editar</a></span>
+                <p class="text-muted">Sin opciones de respuesta guardadas.</p>
                 {% endfor %}
             </div>
+            
+            {% if not quiz.publicado %}
+            <div class="question-actions" style="text-align:center; padding-top:15px; border-top: 1px solid var(--border);">
+                <a href="{% url 'edit_question' quiz.pk q.pk %}" class="btn btn-secondary btn-square" style="border-radius:4px; padding:8px 20px;">Editar</a>
+                <form method="post" action="{% url 'delete_question' quiz.pk q.pk %}" style="display:inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-square" style="border-radius:4px; padding:8px 20px;" onclick="return confirm('¿Eliminar esta pregunta?')">Eliminar</button>
+                </form>
+            </div>
+            {% endif %}
         </div>
         {% endfor %}
     </div>

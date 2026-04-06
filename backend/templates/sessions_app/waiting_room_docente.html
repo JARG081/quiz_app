@@ -31,7 +31,7 @@
             </button>
         </form>
     </div>
-    <ul id="participant-list" class="participant-list"></ul>
+    <div id="participant-list" class="participant-grid"></div>
 </div>
 
 <div class="start-zone">
@@ -61,7 +61,7 @@ async function pollState() {
         document.getElementById('participant-count').textContent = parts.participants ? parts.participants.length : 0;
         const list = document.getElementById('participant-list');
         list.innerHTML = (parts.participants || []).map(p =>
-            `<li class="participant-item">${p.username}</li>`
+            `<div class="participant-card">👤 ${p.username}</div>`
         ).join('');
 
         if (state.estado === 'EN_CURSO') {
