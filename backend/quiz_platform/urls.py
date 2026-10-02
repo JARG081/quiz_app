@@ -1,5 +1,7 @@
+from django.conf import settings
 from django.contrib import admin
 from django.urls import path, include
+from django.conf.urls.static import static
 
 urlpatterns = [
     path('django-admin/', admin.site.urls),
@@ -8,4 +10,4 @@ urlpatterns = [
     path('quizzes/', include('quizzes.urls')),
     path('sessions/', include('sessions_app.urls')),
     path('analytics/', include('analytics.urls')),
-]
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

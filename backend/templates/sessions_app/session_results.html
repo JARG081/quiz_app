@@ -7,6 +7,27 @@
     <span class="text-muted">Sesión {{ session.codigo }}</span>
 </div>
 
+{% if request.user.profile.role == 'DOCENTE' %}
+<div class="card" style="margin-bottom: 24px;">
+    <div class="card-header">
+        <h2>Privacidad y exportación</h2>
+    </div>
+    <div class="card-body">
+        <div style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom: 18px;">
+            <label><input type="checkbox" class="privacy-toggle" data-column="username"> Ocultar estudiante</label>
+            <label><input type="checkbox" class="privacy-toggle" data-column="score"> Ocultar puntaje</label>
+            <label><input type="checkbox" class="privacy-toggle" data-column="correctas"> Ocultar correctas</label>
+            <label><input type="checkbox" class="privacy-toggle" data-column="respondidas"> Ocultar respondidas</label>
+            <label><input type="checkbox" class="privacy-toggle" data-column="porcentaje"> Ocultar % acierto</label>
+        </div>
+        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+            <a id="export-pdf" class="btn btn-secondary" href="{% url 'export_results_pdf' session.pk %}">Descargar PDF</a>
+            <a id="export-xlsx" class="btn btn-primary" href="{% url 'export_results_xlsx' session.pk %}">Descargar XLSX</a>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 {% if request.user.profile.role == 'DOCENTE' and leaderboard %}
 <div class="podium-section glass-box" style="margin-top: 30px; margin-bottom: 50px; text-align: center; padding: 30px; border-radius: 12px;">
     <h2>🏆 Gran Podio de la Sesión</h2>
@@ -67,6 +88,40 @@
 </div>
 {% endif %}
 
+{% if request.user.profile.role == 'DOCENTE' and participant_results %}
+<div class="card" style="margin-bottom: 24px;">
+    <div class="card-header">
+        <h2>Resumen de participantes</h2>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table" id="participants-summary-table">
+                <thead>
+                    <tr>
+                        <th data-column="username">Estudiante</th>
+                        <th data-column="score">Puntaje</th>
+                        <th data-column="correctas">Correctas</th>
+                        <th data-column="respondidas">Respondidas</th>
+                        <th data-column="porcentaje">% Acierto</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in participant_results %}
+                    <tr>
+                        <td data-column="username">{{ row.username }}</td>
+                        <td data-column="score">{{ row.score }}</td>
+                        <td data-column="correctas">{{ row.correctas }}</td>
+                        <td data-column="respondidas">{{ row.respondidas }} / {{ row.total_preguntas }}</td>
+                        <td data-column="porcentaje">{{ row.porcentaje }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="results-list">
     {% for item in results %}
     <div class="result-card">
@@ -74,6 +129,11 @@
             <span class="q-num">{{ forloop.counter }}.</span>
             {{ item.pregunta.enunciado }}
         </div>
+        {% if item.pregunta.imagen %}
+        <div style="margin: 12px 0;">
+            <a href="{{ item.pregunta.imagen.url }}" target="_blank" rel="noopener" class="btn btn-sm btn-ghost">Ver imagen de la pregunta</a>
+        </div>
+        {% endif %}
         <div class="result-options">
             {% for opt in item.opciones %}
             <div class="result-option {% if opt.es_correcta %}option-correct{% endif %}">
@@ -88,6 +148,19 @@
             </div>
             {% endfor %}
         </div>
+        {% if item.pregunta.explicacion or item.pregunta.explicacion_imagen %}
+        <div style="margin-top: 16px; padding: 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-hover);">
+            <strong>Explicación de la respuesta correcta</strong>
+            {% if item.pregunta.explicacion %}
+            <p style="margin: 8px 0 0 0;">{{ item.pregunta.explicacion }}</p>
+            {% endif %}
+            {% if item.pregunta.explicacion_imagen %}
+            <div style="margin-top: 10px;">
+                <a href="{{ item.pregunta.explicacion_imagen.url }}" target="_blank" rel="noopener" class="btn btn-sm btn-ghost">Ver imagen de explicación</a>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
     {% endfor %}
 </div>
@@ -101,4 +174,36 @@
     <a href="{% url 'student_stats' %}" class="btn btn-secondary">Mis Estadísticas</a>
     {% endif %}
 </div>
+
+{% if request.user.profile.role == 'DOCENTE' %}
+<script>
+function buildHiddenColumns() {
+    return [...document.querySelectorAll('.privacy-toggle:checked')].map(cb => cb.dataset.column).join(',');
+}
+
+function refreshExportLinks() {
+    const hidden = buildHiddenColumns();
+    const pdfUrl = new URL(document.getElementById('export-pdf').href, window.location.origin);
+    const xlsxUrl = new URL(document.getElementById('export-xlsx').href, window.location.origin);
+    if (hidden) {
+        pdfUrl.searchParams.set('hide', hidden);
+        xlsxUrl.searchParams.set('hide', hidden);
+    } else {
+        pdfUrl.searchParams.delete('hide');
+        xlsxUrl.searchParams.delete('hide');
+    }
+    document.getElementById('export-pdf').href = pdfUrl.toString();
+    document.getElementById('export-xlsx').href = xlsxUrl.toString();
+
+    document.querySelectorAll('[data-column]').forEach(el => {
+        const column = el.dataset.column;
+        if (!column) return;
+        el.style.display = hidden.split(',').includes(column) ? 'none' : '';
+    });
+}
+
+document.querySelectorAll('.privacy-toggle').forEach(cb => cb.addEventListener('change', refreshExportLinks));
+refreshExportLinks();
+</script>
+{% endif %}
 {% endblock %}

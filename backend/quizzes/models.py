@@ -34,6 +34,9 @@ class Quiz(models.Model):
 class Question(models.Model):
     quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='questions')
     enunciado = models.TextField()
+    imagen = models.FileField(upload_to='quizzes/questions/', null=True, blank=True)
+    explicacion = models.TextField(blank=True)
+    explicacion_imagen = models.FileField(upload_to='quizzes/question_explanations/', null=True, blank=True)
     orden = models.PositiveIntegerField(default=1)
 
     class Meta:

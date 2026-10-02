@@ -10,26 +10,35 @@
 <div class="card card-md">
     <form method="post" class="form-vertical">
         {% csrf_token %}
+        {% if form.errors %}
+        <div class="alert alert-danger" style="margin-bottom: 20px;">
+            Revisa los campos marcados antes de continuar.
+        </div>
+        {% endif %}
         <div class="form-group">
             <label for="titulo">Título *</label>
-            <input type="text" id="titulo" name="titulo" class="form-control" value="{{ quiz.titulo|default:'' }}" required>
+            <input type="text" id="titulo" name="titulo" class="form-control" value="{{ form.titulo.value|default:quiz.titulo|default:'' }}" required>
+            {{ form.titulo.errors }}
         </div>
         <div class="form-group">
             <label for="descripcion">Descripción</label>
-            <textarea id="descripcion" name="descripcion" class="form-control" rows="3">{{ quiz.descripcion|default:'' }}</textarea>
+            <textarea id="descripcion" name="descripcion" class="form-control" rows="3">{{ form.descripcion.value|default:quiz.descripcion|default:'' }}</textarea>
+            {{ form.descripcion.errors }}
         </div>
         <div class="form-group">
             <label for="course">Curso *</label>
-            <select id="course" name="course" class="form-control" required>
+            <select id="course" name="course" class="form-control" required {% if form.course.field.disabled %}disabled{% endif %}>
                 {% for c in mis_cursos %}
-                <option value="{{ c.pk }}" {% if quiz.course.pk == c.pk %}selected{% endif %}>{{ c.nombre }}</option>
+                <option value="{{ c.pk }}" {% if form.course.value|stringformat:'s' == c.pk|stringformat:'s' or quiz.course.pk == c.pk %}selected{% endif %}>{{ c.nombre }}</option>
                 {% endfor %}
             </select>
+            {{ form.course.errors }}
         </div>
         <div class="form-group">
             <label for="tiempo_por_pregunta">Tiempo por pregunta (segundos) *</label>
             <input type="number" id="tiempo_por_pregunta" name="tiempo_por_pregunta" class="form-control"
-                   value="{{ quiz.tiempo_por_pregunta|default:30 }}" min="5" max="120" required>
+                   value="{{ form.tiempo_por_pregunta.value|default:quiz.tiempo_por_pregunta|default:30 }}" min="5" max="120" required>
+            {{ form.tiempo_por_pregunta.errors }}
         </div>
         <div class="form-actions">
             <a href="{% url 'quiz_list' %}" class="btn btn-ghost">Cancelar</a>

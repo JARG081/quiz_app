@@ -8,11 +8,32 @@
 </div>
 
 <div class="card add-question-card" style="padding: 20px; border: 2px dashed var(--border);">
-    <form method="post" class="builder-form">
+    <form method="post" enctype="multipart/form-data" class="builder-form">
         {% csrf_token %}
         <div class="form-group" style="margin-bottom: 20px;">
             <label style="font-weight:bold;">Enunciado de la Pregunta:</label>
             <textarea name="enunciado" class="form-control" rows="2" required style="font-size: 1.1rem; padding: 12px;">{{ question.enunciado }}</textarea>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 20px;">
+            <label style="font-weight:bold;">Imagen de apoyo:</label>
+            <input type="file" name="imagen" class="form-control" accept="image/*">
+            {% if question.imagen %}
+            <p class="hint">Imagen actual: <a href="{{ question.imagen.url }}" target="_blank" rel="noopener">ver archivo</a></p>
+            {% endif %}
+        </div>
+
+        <div class="form-group" style="margin-bottom: 20px;">
+            <label style="font-weight:bold;">Explicación opcional de la respuesta correcta:</label>
+            <textarea name="explicacion" class="form-control" rows="3" style="font-size: 1rem; padding: 12px;" placeholder="Explica la respuesta correcta...">{{ question.explicacion }}</textarea>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 20px;">
+            <label style="font-weight:bold;">Imagen opcional para la explicación:</label>
+            <input type="file" name="explicacion_imagen" class="form-control" accept="image/*">
+            {% if question.explicacion_imagen %}
+            <p class="hint">Imagen de explicación actual: <a href="{{ question.explicacion_imagen.url }}" target="_blank" rel="noopener">ver archivo</a></p>
+            {% endif %}
         </div>
 
         <div class="form-group" style="margin-bottom: 20px; background: var(--bg-hover); padding: 15px; border-radius: 8px;">

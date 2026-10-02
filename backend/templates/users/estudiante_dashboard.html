@@ -12,6 +12,10 @@
         <span class="stat-number">{{ mis_cursos|length }}</span>
         <span class="stat-label">Cursos inscritos</span>
     </div>
+    <div class="stat-card">
+        <span class="stat-number">{{ pending_requests|length }}</span>
+        <span class="stat-label">Solicitudes pendientes</span>
+    </div>
 </div>
 
 <div class="card">
@@ -30,6 +34,77 @@
         {% else %}
         <div class="empty-state">
             <p>No estás inscrito en ningún curso aún.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card" style="margin-top: 24px;">
+    <div class="card-header"><h2>Solicitudes pendientes</h2></div>
+    <div class="card-body">
+        {% if pending_requests %}
+        <div class="course-grid">
+            {% for request in pending_requests %}
+            <div class="course-card">
+                <div class="course-icon">⏳</div>
+                <h3>{{ request.course.nombre }}</h3>
+                <p class="text-muted">Esperando aprobación del docente</p>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No tienes solicitudes pendientes.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card" style="margin-top: 24px;">
+    <div class="card-header"><h2>Solicitudes rechazadas</h2></div>
+    <div class="card-body">
+        {% if rejected_requests %}
+        <div class="course-grid">
+            {% for request in rejected_requests %}
+            <div class="course-card">
+                <div class="course-icon">❌</div>
+                <h3>{{ request.course.nombre }}</h3>
+                <p class="text-muted">Tu solicitud fue rechazada</p>
+                <form method="post" action="{% url 'request_enrollment' request.course.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-primary">Solicitar de nuevo</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No tienes solicitudes rechazadas.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card" style="margin-top: 24px;">
+    <div class="card-header"><h2>Cursos disponibles para solicitar</h2></div>
+    <div class="card-body">
+        {% if available_courses %}
+        <div class="course-grid">
+            {% for course in available_courses %}
+            <div class="course-card">
+                <div class="course-icon">➕</div>
+                <h3>{{ course.nombre }}</h3>
+                <p class="text-muted">{{ course.descripcion|truncatechars:80 }}</p>
+                <form method="post" action="{% url 'request_enrollment' course.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-primary">Solicitar inscripción</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No hay cursos disponibles para solicitar en este momento.</p>
         </div>
         {% endif %}
     </div>

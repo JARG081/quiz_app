@@ -10,13 +10,20 @@
 <div class="card card-md">
     <form method="post" class="form-vertical">
         {% csrf_token %}
+        {% if form.errors %}
+        <div class="alert alert-danger" style="margin-bottom: 20px;">
+            Revisa los campos antes de continuar.
+        </div>
+        {% endif %}
         <div class="form-group">
             <label for="nombre">Nombre del curso *</label>
-            <input type="text" id="nombre" name="nombre" class="form-control" value="{{ course.nombre|default:'' }}" required>
+            <input type="text" id="nombre" name="nombre" class="form-control" value="{{ form.nombre.value|default:course.nombre|default:'' }}" required>
+            {{ form.nombre.errors }}
         </div>
         <div class="form-group">
             <label for="descripcion">Descripción</label>
-            <textarea id="descripcion" name="descripcion" class="form-control" rows="4">{{ course.descripcion|default:'' }}</textarea>
+            <textarea id="descripcion" name="descripcion" class="form-control" rows="4">{{ form.descripcion.value|default:course.descripcion|default:'' }}</textarea>
+            {{ form.descripcion.errors }}
         </div>
         <div class="form-actions">
             <a href="{% url 'course_list' %}" class="btn btn-ghost">Cancelar</a>

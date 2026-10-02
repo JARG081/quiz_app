@@ -25,6 +25,12 @@
         </div>
     </div>
 
+    <!-- Paused -->
+    <div id="state-paused" class="live-state-panel hidden">
+        <h2>⏸ Sesión pausada</h2>
+        <p>El docente detuvo temporalmente la actividad. Espera a que la reanude para continuar.</p>
+    </div>
+
     <!-- Finished -->
     <div id="state-finished" class="live-state-panel hidden">
         <h2>🏁 Quiz finalizado</h2>
@@ -47,7 +53,7 @@ let answered = false;
 let maxTime = 30;
 
 function show(id) {
-    ['state-waiting','state-question','state-finished'].forEach(s => {
+    ['state-waiting','state-question','state-paused','state-finished'].forEach(s => {
         document.getElementById(s).classList.toggle('hidden', s !== id);
     });
 }
@@ -65,6 +71,11 @@ async function poll() {
             return;
         }
 
+        if (data.estado === 'PAUSADO') {
+            show('state-paused');
+            return;
+        }
+
         if (data.estado !== 'EN_CURSO' || !data.pregunta) { show('state-waiting'); return; }
 
         const q = data.pregunta;
@@ -78,6 +89,8 @@ async function poll() {
             document.getElementById('q-number').textContent = `Pregunta ${q.orden} de ${data.total_preguntas}`;
             document.getElementById('q-text').textContent = q.enunciado;
 
+            const imageHtml = q.imagen ? `<div style="margin: 10px 0 0 0;"><a href="${q.imagen}" target="_blank" rel="noopener" class="btn btn-sm btn-ghost">Ver imagen de apoyo</a></div>` : '';
+
             const colors = ['option-a','option-b','option-c','option-d'];
             document.getElementById('options-grid').innerHTML = q.opciones.map((o, i) =>
                 `<button class="option-btn ${colors[i]}" id="opt-${o.id}"
@@ -85,6 +98,8 @@ async function poll() {
                     <strong>${o.letra}</strong> ${o.texto}
                  </button>`
             ).join('');
+
+            document.getElementById('q-text').insertAdjacentHTML('afterend', imageHtml);
 
             document.getElementById('answered-msg').classList.toggle('hidden', !answered);
         }

@@ -1,0 +1,56 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: quiz_platform
+      POSTGRES_USER: quiz_platform
+      POSTGRES_PASSWORD: quiz_platform
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quiz_platform -d quiz_platform"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    environment:
+      DEBUG: "0"
+      SECRET_KEY: "docker-secret-key-change-me"
+      ALLOWED_HOSTS: "*"
+      DB_ENGINE: django.db.backends.postgresql
+      DB_NAME: quiz_platform
+      DB_USER: quiz_platform
+      DB_PASSWORD: quiz_platform
+      DB_HOST: db
+      DB_PORT: "5432"
+      STATIC_ROOT: /staticfiles
+      MEDIA_ROOT: /mediafiles
+    volumes:
+      - static_data:/staticfiles
+      - media_data:/mediafiles
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - static_data:/var/www/static:ro
+      - media_data:/var/www/media:ro
+    depends_on:
+      backend:
+        condition: service_started
+
+volumes:
+  postgres_data:
+  static_data:
+  media_data:

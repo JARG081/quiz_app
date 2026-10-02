@@ -1,0 +1,494 @@
+CAMBIOS DEL PROYECTO
+
+Última revisión: 2026-10-01. Cambio de enfoque: QUIZ NORMAL (cada estudiante responde a su ritmo y la
+nota es el % de aciertos). El modo en vivo tipo Kahoot se RETIRA. Lo necesario para volver a agregarlo
+más adelante está en MODO_EN_VIVO.md.
+
+Objetivo de la aplicación:
+El docente sube archivos, a partir de ellos se generan quices, el docente los verifica y publica, los
+asigna a un curso con fechas, los estudiantes los responden a su ritmo y el administrador ve las cifras
+generales de todos (divididas por curso, docente, etc.).
+
+>>> Si eres la IA que va a implementar: lee primero la SECCIÓN 6 (instrucciones para el implementador).
+
+
+========================================================================================
+1. ESTADO REAL (verificado contra el código el 2026-10-01)
+========================================================================================
+
+1.1 Funcionalidades presentes
+  ✅ Autenticación y control por roles (ADMIN, DOCENTE, ESTUDIANTE), con redirección a cada panel.
+  ✅ Administración de usuarios (crear, editar, eliminar y cambiar rol).
+  ✅ Cursos: CRUD, asignación de docentes, inscripción directa por el admin.
+  ✅ Solicitud de inscripción del estudiante con aprobación o rechazo del docente.
+  ✅ Constructor manual de quices: opción múltiple (4 opciones) y V/F, imagen y explicación opcionales.
+  ✅ Reordenamiento de preguntas con arrastrar y soltar.
+  ✅ Publicación con reglas: 5 a 20 preguntas, 2 o 4 opciones y exactamente 1 correcta.
+  ✅ Recuperación de contraseña con token.
+  ✅ Auditoría en audit.log (7 acciones).
+  ✅ Docker (backend + nginx + Postgres). La estructura existe, pero aún no se ha probado dentro de Docker.
+  ✅ Pruebas: 32 en total. Todas pasan y no hay migraciones pendientes.
+  ⚠️ Modo en vivo (sessions_app): funciona, pero tiene varios errores (2.2) y se RETIRA en la Fase 2.
+     Solo hay datos de prueba (1 sesión, 10 respuestas), así que se descartan.
+
+1.2 Funcionalidades centrales que NO existen
+  ❌ Quiz normal: asignación a un curso con fechas, intentos del estudiante y nota por % de aciertos.
+  ❌ Subida de archivos y generación de quices con IA.
+  ❌ Verificación del docente antes de publicar.
+  ❌ Panel de estadísticas del administrador (globales, por curso o por docente).
+
+1.3 Correcciones a lo que afirmaba la versión anterior de este documento
+  - "La base funcional está completa": FALSO (ver 1.2).
+  - "El reordenamiento se impide si el quiz está publicado": SOLO en el navegador. El servidor
+    (reorder_questions_api / reorder_questions) no revisa 'publicado'.
+  - "La auditoría registra creación/edición/publicación": la EDICIÓN no se registra.
+  - "Privacidad por columnas en resultados": la página de resultados no tenía control de acceso.
+  - Pausa y reanudación: estaba duplicada en models.py y en services.py, y el tiempo pausado se
+    arrastraba a la pregunta siguiente.
+
+
+========================================================================================
+2. ERRORES ENCONTRADOS
+========================================================================================
+
+2.1 Siguen vigentes (corregir)
+  [S2] Acciones que cambian datos y aceptan GET (CSRF evitable con un simple enlace):
+       toggle_publish (quizzes), remove_teacher y unenroll_student (courses).
+  [S3] forgot_password usa User.objects.get(email=...). El email no es único, así que da error 500
+       (MultipleObjectsReturned) si hay correos repetidos. Además revela qué correos están registrados.
+  [S4] Valores por defecto inseguros en settings: DEBUG=True, ALLOWED_HOSTS='*', SECRET_KEY fija,
+       AUTH_PASSWORD_VALIDATORS vacío.
+  [D1] Se pueden agregar, editar y borrar preguntas aunque el quiz esté publicado o ya se haya respondido,
+       lo que altera los resultados históricos.
+  [Q1] reorder_questions_api no valida 'publicado' en el servidor.
+  [R1] Hay 46 archivos __pycache__ y db.sqlite3 versionados en git, no hay .gitignore y audit.log está sin ignorar.
+  [R2] docente_stats ignora el filtro por curso y hace consultas N+1 (se reescribe en la Fase 2).
+
+2.2 Desaparecen al retirar el modo en vivo (NO corregir; están documentados en MODO_EN_VIVO.md
+    como requisitos para cuando se vuelva a construir)
+  [S1] APIs de sesión sin control de acceso; results_api revelaba la respuesta correcta en curso.
+  [L1] La pausa se arrastraba a la pregunta siguiente.   [L2] Carrera en el avance automático.
+  [L3] IntegrityError con doble envío.                    [L4] mostrando_resultados nunca se activaba.
+  [L5] El ranking incluía a los expulsados.               [L6] Redirección incorrecta de una sesión PAUSADO.
+
+
+========================================================================================
+3. PLAN DE IMPLEMENTACIÓN (en orden; una fase por vez)
+========================================================================================
+
+----------------------------------------------------------------------------------------
+3.0 CICLO DE VIDA DEL QUIZ
+----------------------------------------------------------------------------------------
+Son CINCO pasos separados, cada uno con su botón, su vista y su regla. Ninguno dispara a otro.
+
+  [1] GENERACIÓN / CREACIÓN -> quiz en BORRADOR (publicado=False, sin verificar).
+        Puede ser manual (constructor) o desde archivos con IA (Fase 5). Generar NUNCA publica.
+  [2] VERIFICACIÓN -> el docente resuelve el quiz SIN límite de tiempo y obtiene 100 % (Fase 4).
+  [3] PUBLICACIÓN -> publicado=True. Requiere: reglas de contenido + verificación vigente.
+        "Publicado" significa "listo para asignar"; los estudiantes todavía no lo ven.
+  [4] ASIGNACIÓN -> el docente crea una Asignacion del quiz para su curso, con fechas e intentos.
+        Requiere: publicado + verificación vigente (se vuelve a comprobar). Aquí lo ven los estudiantes.
+  [5] RESOLUCIÓN -> el estudiante inscrito (APROBADA) hace sus intentos dentro de la ventana.
+
+  Reglas de transición:
+  - Editar el contenido (pregunta, opción, respuesta correcta, orden) invalida la verificación de
+    forma automática, porque cambia el hash (Fase 4).
+  - Editar un quiz publicado SIN asignaciones lo despublica automáticamente y se avisa al docente.
+  - Un quiz CON asignaciones no se edita; se duplica (Fase 3).
+  - Editar solo metadatos (título, descripción) no invalida la verificación.
+  - Despublicar está permitido. Las asignaciones existentes siguen funcionando, pero no se pueden
+    crear nuevas.
+
+----------------------------------------------------------------------------------------
+FASE 0 – Respaldo, limpieza y seguridad general
+----------------------------------------------------------------------------------------
+  Tareas:
+  - RESPALDO (pedir confirmación al usuario antes de ejecutar comandos de git): hacer commit del
+    estado actual y crear la etiqueta `pre-quiz-normal`. MODO_EN_VIVO.md hace referencia a esa
+    etiqueta para recuperar el código del modo en vivo.
+  - .gitignore (__pycache__/, *.pyc, db.sqlite3, audit.log*, media/, staticfiles/, venv/, .env)
+    y `git rm --cached` de lo ya versionado. NO borrar los archivos del disco.            [R1]
+  - @require_POST en toggle_publish, remove_teacher y unenroll_student.                  [S2]
+  - forgot_password: filter(email__iexact=...), enviar a cada usuario encontrado y mostrar SIEMPRE
+    el mismo mensaje ("Si el correo existe, recibirás un enlace"). Quitar del ForgotPasswordForm
+    la validación de que el email existe y ajustar sus pruebas.                            [S3]
+  - settings.py: si DEBUG=0 y falta SECRET_KEY -> ImproperlyConfigured. ALLOWED_HOSTS por defecto
+    'localhost,127.0.0.1'. Validadores estándar de contraseña. SMTP desde el entorno.      [S4]
+  - reorder_questions_api: si quiz.publicado -> 400 con mensaje.                         [Q1]
+  Criterios de aceptación:
+  - GET a toggle_publish, remove_teacher y unenroll_student no cambia nada.
+  - forgot_password con un correo repetido en 2 usuarios no da 500 y el mensaje es el mismo exista o no.
+  - Con DEBUG=0 y sin SECRET_KEY, Django no arranca.
+  - POST de reordenamiento sobre un quiz publicado devuelve 400.
+
+----------------------------------------------------------------------------------------
+FASE 1 – Quiz normal (asignaciones e intentos)
+----------------------------------------------------------------------------------------
+  Nueva app: evaluaciones (agregarla a INSTALLED_APPS).
+  Modelos:
+    - Asignacion
+        quiz FK Quiz (PROTECT), creado_por FK User,
+        modo CharField choices [NORMAL] default NORMAL   <- punto de extensión para el modo en vivo;
+                                                            hoy SOLO existe NORMAL (ver MODO_EN_VIVO.md)
+        abre_en DateTime, cierra_en DateTime (obligatoria, > abre_en),
+        intentos_permitidos PositiveSmallInteger (1 a 5, default 1),
+        tiempo_limite_minutos PositiveSmallInteger null (null = sin límite; 1 a 180),
+        mostrar_respuestas choices [AL_ENVIAR | AL_CIERRE | NUNCA] default AL_CIERRE,
+        cerrada_manualmente bool default False, creado_en.
+        Métodos: esta_abierta(now), estado() -> PROGRAMADA | ABIERTA | CERRADA.
+        El curso es quiz.course (no se duplica el campo).
+    - Intento
+        asignacion FK, estudiante FK User, numero PositiveSmallInteger,
+        iniciado_en, enviado_en null, limite_en DateTime (calculado al iniciar:
+          min(iniciado_en + tiempo_limite, asignacion.cierra_en)),
+        estado [EN_PROGRESO | ENVIADO], enviado_automaticamente bool,
+        correctas, total, nota Decimal(5,2) (0-100), hash_contenido CharField(64) (hash del quiz al iniciar).
+        unique_together (asignacion, estudiante, numero).
+    - RespuestaIntento
+        intento FK, question FK, option FK null, es_correcta bool (COPIA tomada al calificar, para
+        que el historial no dependa de ediciones futuras), respondida_en.
+        unique_together (intento, question).
+  Servicios (evaluaciones/services.py). Toda la lógica va aquí, independiente del modo, para que el
+  modo en vivo futuro la reutilice:
+    - asignaciones_disponibles(estudiante): abiertas, de cursos con Enrollment APROBADA.
+    - iniciar_intento(asignacion, estudiante): valida inscripción, ventana abierta, intentos restantes
+      y que no haya otro intento EN_PROGRESO (si lo hay, lo devuelve y no crea uno nuevo).
+    - guardar_respuesta(intento, question, option): solo si EN_PROGRESO y now <= limite_en + 30 s
+      de gracia. Crear o actualizar con update_or_create (el estudiante puede cambiar su respuesta
+      hasta enviar). Validar que la opción pertenece a la pregunta y la pregunta al quiz.
+    - enviar_intento(intento, automatico=False): califica con las respuestas guardadas (sin
+      responder = incorrecta), copia es_correcta, calcula nota = round(correctas/total*100, 2).
+      Idempotente: si ya está ENVIADO, no hace nada.
+    - cerrar_intentos_vencidos(asignacion=None): envía de forma automática los EN_PROGRESO con
+      now > limite_en + gracia. Se llama de forma perezosa al abrir el dashboard del estudiante,
+      la vista del intento y los resultados del docente (no hay cron).
+    - nota_final(asignacion, estudiante): la del MEJOR intento ENVIADO (en empate, el primero).
+    - puede_ver_respuestas(intento): según mostrar_respuestas (AL_ENVIAR: si está enviado;
+      AL_CIERRE: si la asignación está cerrada; NUNCA: no).
+    - La nota NUNCA depende del tiempo de respuesta. El tiempo solo limita la entrega.
+  Vistas DOCENTE (solo para quices de cursos que tenga asignados):
+    - GET/POST quizzes/<id>/asignar/ -> asignacion_form.html. Solo si quiz.publicado.
+      (En la Fase 4 se añade "y verificado".)
+    - GET evaluaciones/ -> lista de asignaciones del docente con estado, participación (enviados /
+      inscritos) y promedio.
+    - GET evaluaciones/<id>/ -> resultados:
+        * tabla con TODOS los inscritos APROBADA: estado (sin iniciar / en progreso / enviado),
+          intentos usados, mejor nota y fecha de envío;
+        * % de acierto por pregunta (usando el intento que cuenta para la nota de cada estudiante),
+          con la distribución por opción;
+        * exportar a PDF y XLSX con columnas ocultables: reutilizar el código de
+          export_results_pdf/export_results_xlsx de sessions_app (etiqueta pre-quiz-normal)
+          adaptado a Intento.
+    - POST evaluaciones/<id>/cerrar/ (cierra ya), POST evaluaciones/<id>/extender/ (nueva cierra_en
+      posterior), POST evaluaciones/<id>/eliminar/ (solo si no tiene intentos).
+  Vistas ESTUDIANTE:
+    - estudiante_dashboard: secciones "Quices pendientes" (abiertos con intentos restantes),
+      "En progreso" y "Completados" (nota final y enlace a la revisión). Quitar "Unirse con código".
+    - POST evaluaciones/<id>/iniciar/ -> crea o retoma el intento -> redirect a la vista del intento.
+    - GET evaluaciones/intento/<id>/ -> intento.html: TODAS las preguntas en una página, en el orden
+      del quiz, con imagen si existe. Cada selección se guarda al instante con fetch POST a
+      evaluaciones/intento/<id>/responder/ (JSON {question_id, option_id}), así que recargar no pierde
+      nada. Si hay límite, se muestra un contador regresivo, pero la fuente de verdad es limite_en en
+      el servidor; al llegar a 0 se envía solo. Botón "Enviar" con confirmación si hay preguntas sin
+      responder. NUNCA incluir la respuesta correcta ni la explicación en este HTML.
+    - POST evaluaciones/intento/<id>/enviar/ -> redirect a la revisión.
+    - GET evaluaciones/intento/<id>/revision/ -> nota y aciertos. Si puede_ver_respuestas: por pregunta,
+      la opción marcada, la correcta y la explicación (con su imagen). Si no: solo la nota y el aviso
+      "Las respuestas se mostrarán al cierre" o "no se mostrarán".
+    - Un estudiante solo accede a SUS intentos (si no, 404).
+  Auditoría: ASSIGNMENT_CREATE, ASSIGNMENT_CLOSE, ASSIGNMENT_EXTEND, ASSIGNMENT_DELETE,
+    ATTEMPT_SUBMIT (incluye automatico=True/False).
+  Criterios de aceptación:
+  - Un estudiante no inscrito (o con inscripción PENDIENTE) no ve la asignación ni puede iniciarla.
+  - Antes de abre_en o después de cierra_en no se puede iniciar.
+  - Con intentos_permitidos=1, un segundo POST a iniciar devuelve el mismo intento EN_PROGRESO y,
+    después de enviar, se rechaza.
+  - Guardar una respuesta después de limite_en + gracia devuelve 400.
+  - Un intento vencido se califica automáticamente con las respuestas guardadas.
+  - La nota es el % de aciertos; dos estudiantes con las mismas respuestas y tiempos distintos
+    obtienen la misma nota.
+  - nota_final devuelve el mejor intento.
+  - El HTML de intento.html no contiene 'es_correcta' ni la explicación.
+  - mostrar_respuestas=AL_CIERRE: la revisión no muestra la clave antes del cierre y sí después.
+  - Un estudiante no puede ver ni responder el intento de otro.
+  - El docente ve en los resultados también a los inscritos sin iniciar.
+
+----------------------------------------------------------------------------------------
+FASE 2 – Retirar el modo en vivo y reescribir las estadísticas
+----------------------------------------------------------------------------------------
+  Requisito previo: Fase 0 (etiqueta pre-quiz-normal) y Fase 1 terminadas.
+  Tareas:
+  - Borrar las vistas, URLs, plantillas (templates/sessions_app/*), services y tests de sessions_app,
+    y el include 'sessions/' en quiz_platform/urls.py.
+  - Borrar los modelos de sessions_app/models.py y generar la migración que elimina las tablas
+    (son datos de prueba). MANTENER la app sessions_app registrada con su carpeta migrations/,
+    solo con models.py vacío, para que las bases existentes (incluida la de Docker) apliquen la
+    migración de borrado. Se podrá quitar del todo más adelante.
+  - Buscar con grep y eliminar TODAS las referencias: nombres de URL (create_session, session_list,
+    join_session, session_results, live_session_*, waiting_room_*, export_results_*) y los imports
+    de sessions_app en otras apps (quizzes/views.py importa active_session_for_teacher;
+    analytics/views.py importa modelos y servicios). Plantillas conocidas con enlaces:
+    users/docente_dashboard.html, users/estudiante_dashboard.html y quizzes/quiz_list.html.
+  - Reescribir analytics sobre evaluaciones (Intento, con nota_final):
+      student_stats: por asignación, la nota final, los aciertos y el promedio general.
+      docente_stats: por asignación de sus cursos, la participación, el promedio y el % de acierto
+      por pregunta; aplicar el filtro ?course=; sin N+1 (verificarlo con assertNumQueries).     [R2]
+  - En el panel del docente, reemplazar "Sesiones" por "Asignaciones".
+  Criterios de aceptación:
+  - `grep -rn "sessions_app\|QuizSession\|LiveAnswer" backend --include=*.py --include=*.html`
+    solo encuentra sessions_app/migrations/ y sessions_app/apps.py.
+  - manage.py check, makemigrations --check y la suite completa pasan.
+  - Las estadísticas del estudiante y del docente muestran datos de Intento.
+
+----------------------------------------------------------------------------------------
+FASE 3 – Bloquear quices con historial                                                     [D1]
+----------------------------------------------------------------------------------------
+  - Quiz.tiene_asignaciones() -> Asignacion.objects.filter(quiz=self).exists().
+  - quizzes/services.py: assert_quiz_editable(quiz) -> (ok, mensaje). Rechaza si tiene_asignaciones().
+    Usarlo en add_question, edit_question, delete_question y reorder_questions_api. Si está publicado
+    y sin asignaciones: permitir, poner publicado=False y mostrar el aviso
+    'El quiz se despublicó porque cambió su contenido. Verifícalo y publícalo de nuevo.'
+  - duplicate_quiz(quiz, user): nuevo Quiz "<titulo> (copia)", el mismo curso y descripción,
+    publicado=False, y una copia de las preguntas y opciones en el mismo orden. Las imágenes se
+    reutilizan (mismo .name). La verificación se copia porque el contenido es idéntico.
+    Vista POST quizzes/<id>/duplicate/ y botón en quiz_builder.html y quiz_list.html.
+  - quiz_builder.html: si tiene asignaciones, ocultar editar, agregar, borrar y arrastrar, y mostrar
+    "Este quiz ya fue asignado. Duplícalo para modificarlo."
+  - Auditoría: QUIZ_EDIT, QUESTION_EDIT y QUIZ_DUPLICATE.
+  - Quitar Quiz.tiempo_por_pregunta (ya no se usa) con su migración, y quitarlo de QuizForm y de
+    las plantillas.
+  Criterios de aceptación:
+  - En un quiz con una asignación, add, edit, delete y reorder no cambian nada y avisan.
+  - Editar una pregunta de un quiz publicado sin asignaciones lo deja con publicado=False.
+  - La copia tiene las mismas preguntas, opciones y clave.
+
+----------------------------------------------------------------------------------------
+FASE 4 – Verificación obligatoria del docente
+----------------------------------------------------------------------------------------
+  Requisito: el docente resuelve el quiz una vez con 100 % de aciertos, SIN límite de tiempo, antes de
+  poder publicarlo (paso [2] del ciclo 3.0).
+  Modelo (quizzes/models.py):
+    - Quiz.hash_verificado CharField(64, null) y Quiz.verificado_en DateTime null.
+    - TeacherVerificationAttempt(quiz, docente, iniciado_en, finalizado_en, correctas, total,
+      aprobado, hash_contenido) y TeacherVerificationAnswer(attempt, question, option_marcada null).
+  Servicios (quizzes/services.py):
+    - compute_quiz_hash(quiz): SHA-256 de un JSON canónico (sort_keys=True) ordenado por question.orden
+      y option.letra: [{orden, enunciado, opciones: [{letra, texto, es_correcta}]}].
+      Solo debe acceder a campos y a quiz.questions / q.options, para que funcione con los modelos
+      históricos de la migración de datos.
+    - quiz_is_verified(quiz): quiz.hash_verificado == compute_quiz_hash(quiz).
+    - validate_quiz_publishable(quiz) -> lista de errores: las reglas que hoy están en toggle_publish
+      (5 a 20 preguntas, 2 o 4 opciones, 1 correcta) más "no verificado".
+    - grade_verification(quiz, docente, {question_id: option_id}) -> attempt.
+  Migración de datos (DECISIÓN): los quices existentes quedan VERIFICADOS (hash_verificado =
+    compute_quiz_hash, verificado_en = now). Siguen siendo editables; editar su contenido invalida
+    la verificación.
+  Vistas y plantillas:
+    - GET/POST quizzes/<id>/verify/ -> verify_quiz.html: todas las preguntas en una página, sin
+      temporizador y SIN ninguna marca de la respuesta correcta ni la explicación en el HTML.
+      Solo el creador. Si fallan las reglas de contenido, redirigir al constructor con los errores.
+    - GET quizzes/<id>/verify/<attempt_id>/ -> verify_result.html:
+        100 %: guarda hash_verificado y verificado_en, audita QUIZ_VERIFY_PASS y muestra "Publicar".
+        < 100 %: tabla "Pregunta N | Marcaste X | La clave dice Y | [Editar pregunta]" de las erradas,
+        más "Reintentar". Audita QUIZ_VERIFY_FAIL. Las preguntas sin responder cuentan como erradas.
+    - quiz_builder.html: insignia "Verificado ✓" o "Sin verificar", botón "Resolver verificación" y
+      "Publicar" deshabilitado mientras no esté verificado.
+  Bloqueos en el servidor:
+    - toggle_publish (al publicar): rechazar si validate_quiz_publishable devuelve errores.
+    - Crear una Asignacion: rechazar si not quiz.publicado o not quiz_is_verified(quiz).
+  Criterios de aceptación:
+  - Publicar sin verificar: error y publicado sigue en False.
+  - Verificar con todo correcto -> verificado; con una errada -> no.
+  - Editar el texto de una opción después de verificar -> deja de estar verificado.
+  - Editar solo el título no cambia la verificación.
+  - Después de la migración, todos los quices existentes están verificados.
+  - Otro docente no accede a /verify/.
+  - El HTML de verify_quiz no revela la respuesta correcta.
+
+----------------------------------------------------------------------------------------
+FASE 5 – Generar quices desde archivos con IA
+----------------------------------------------------------------------------------------
+  Proveedor (DECISIÓN): Gemini o DeepSeek, intercambiables.
+  Configuración, SOLO con variables de entorno (ningún valor escrito en el código):
+    QUIZ_AI_PROVIDER          'gemini' | 'deepseek'
+    GEMINI_API_KEY            clave de Gemini
+    GEMINI_MODEL              nombre del modelo de Gemini (ej.: gemini-2.5-flash)
+    DEEPSEEK_API_KEY          clave de DeepSeek
+    DEEPSEEK_MODEL            nombre del modelo de DeepSeek (ej.: deepseek-chat)
+    QUIZ_AI_MAX_SOURCE_CHARS  máximo de caracteres de texto fuente (ej.: 60000)
+    - settings.py solo los lee con os.getenv(). Si falta el proveedor, la clave o el modelo del
+      proveedor elegido, la vista muestra "La generación con IA no está configurada" y no da 500.
+    - docker-compose.yml (backend): env_file: .env. El .env NO se versiona.
+    - .env.example con todas las variables: las claves vacías y los modelos con los ejemplos de arriba.
+      Cambiar de modelo = editar .env y reiniciar.
+  Dependencias (requirements.txt): pypdf, python-docx, python-pptx, google-genai, openai
+    (DeepSeek usa una API compatible con OpenAI: base_url='https://api.deepseek.com').
+  Nueva app: quiz_generation.
+  Modelos:
+    - SourceDocument(course, docente, archivo upload_to='sources/', nombre_original,
+      tipo [PDF|DOCX|PPTX|TXT], texto_extraido, fecha)
+    - GenerationJob(docente, course, documentos M2M, quiz FK null, parametros JSON,
+      estado [PENDIENTE|PROCESANDO|COMPLETADO|FALLIDO], mensaje, preguntas_solicitadas,
+      preguntas_generadas, creado_en, iniciado_en, finalizado_en)
+  Servicios:
+    - extraction.py: extract_text(file, tipo). Con menos de 200 caracteres extraídos:
+      "No se pudo extraer texto (¿PDF escaneado?)".
+    - providers.py: una interfaz común generate(prompt, schema) -> dict, con GeminiProvider
+      (google-genai, response_mime_type='application/json' + response_schema) y DeepSeekProvider
+      (openai SDK, response_format={'type': 'json_object'}). get_provider() lee la configuración.
+      Ante 429 o falta de cuota: "Se agotó la cuota gratuita del proveedor; intenta más tarde o cambia
+      de proveedor". Hasta 2 reintentos con espera exponencial. Timeout de 90 s.
+    - generator.py: generate_quiz(job). Prompt en español que pida usar SOLO el contenido del texto y
+      devolver este JSON:
+        {"preguntas": [{"tipo": "MC"|"VF", "enunciado": str,
+                        "opciones": {"A": str, "B": str, "C": str, "D": str},  (VF: solo A=Verdadero, B=Falso)
+                        "correcta": "A".."D", "explicacion": str}]}
+      Validar cada pregunta con quizzes.services.validate_question_options() y descartar las inválidas
+      o duplicadas. Con 5 o más válidas: crear el Quiz (publicado=False, sin verificar) usando
+      sync_question_options(). Con menos de 5: el job queda FALLIDO. Si el texto supera el máximo,
+      se trunca y se avisa.
+  Ejecución en segundo plano (sin Celery):
+    - threading.Thread(daemon=True) lanzado en transaction.on_commit.
+    - El hilo llama a close_old_connections() al empezar y al terminar, y captura todas las
+      excepciones para dejar FALLIDO con un mensaje legible.
+    - Un job en PROCESANDO por más de 10 minutos se muestra como FALLIDO ("interrumpido") al consultarlo.
+  Vistas (solo DOCENTE, solo cursos propios):
+    - GET/POST quizzes/generate/ -> generate_form.html: curso, título, 1 a 3 archivos
+      (PDF/DOCX/PPTX/TXT, máximo 10 MB cada uno, validar extensión y contenido), número de preguntas
+      (5 a 20), tipo (Solo opción múltiple | Solo V/F | Mixto) e instrucciones opcionales (500 caracteres).
+    - GET quizzes/generate/<job_id>/ con polling cada 2 s a .../status/ (JSON: estado, mensaje, quiz_id).
+      COMPLETADO -> enlace al constructor. FALLIDO -> el mensaje y "Reintentar".
+    - Botón "Generar desde archivos" en quiz_list.html y en docente_dashboard.html.
+  Auditoría: SOURCE_UPLOAD, QUIZ_GENERATE (job_id, quiz_id, proveedor, n) y QUIZ_GENERATE_FAIL.
+  Pruebas: SIN red; simular (mock) get_provider(). Cubrir la extracción, el descarte de inválidas,
+    FALLIDO con menos de 5, que el quiz quede en borrador sin verificar, curso ajeno y configuración ausente.
+  Criterios de aceptación:
+  - PDF con texto y 10 preguntas pedidas -> borrador con 5 a 10 preguntas válidas.
+  - El quiz generado no se puede publicar sin pasar la Fase 4.
+  - Sin configuración, mensaje claro y nunca 500.
+
+----------------------------------------------------------------------------------------
+FASE 6 – Analítica del administrador
+----------------------------------------------------------------------------------------
+  - analytics/admin/ (ADMIN) -> admin_stats.html. Indicadores globales: cursos, docentes,
+    estudiantes, quices (borrador / publicados), asignaciones (abiertas / cerradas), intentos enviados
+    y promedio general (de las notas finales).
+  - Tabla por curso: quices, asignaciones, inscritos APROBADA, estudiantes con al menos un envío,
+    tasa de participación (por asignación: enviados / inscritos, promediada), promedio de nota
+    final y última actividad.
+  - analytics/admin/course/<id>/: docentes, asignaciones (fechas, participación, promedio) y las
+    5 preguntas con menor acierto.
+  - Filtros GET: course, docente, desde y hasta (sobre cierra_en).
+  - Exportar a XLSX la tabla por curso. Enlace en admin_dashboard.html.
+  - Consultas con annotate/aggregate; el número de consultas no crece con los datos (assertNumQueries).
+
+----------------------------------------------------------------------------------------
+FASE 7 – Pulido
+----------------------------------------------------------------------------------------
+  - Edición del perfil propio (email, nombre y cambio de contraseña con la contraseña actual).
+  - Opcional: mezclar el orden de preguntas y opciones por intento (guardar el orden en el Intento).
+  - Ejecutar la suite completa en Docker y las pruebas manuales de 5.2.
+
+
+========================================================================================
+4. DECISIONES
+========================================================================================
+  Tomadas:
+  1. Enfoque: SOLO quiz normal (opción A). El modo en vivo se retira; para volver a agregarlo,
+     ver MODO_EN_VIVO.md. El modelo de datos (Asignacion.modo + Intento) queda preparado para ello.
+  2. La nota es el % de aciertos y NUNCA depende del tiempo de respuesta.
+  3. Proveedor de IA: Gemini o DeepSeek. El proveedor y los modelos se configuran SOLO en .env.
+  4. Generación, verificación, publicación, asignación y resolución son pasos separados (3.0).
+  5. La verificación del docente no tiene límite de tiempo.
+  6. Los quices existentes quedan verificados por defecto y siguen siendo editables.
+  7. Los datos del modo en vivo actual son de prueba y se descartan.
+
+  Valores por defecto asumidos (CONFIRMAR con el usuario; el implementador debe usarlos tal cual):
+  8. Cada asignación tiene fecha de apertura y de cierre obligatorias.
+  9. Intentos permitidos configurables (1 a 5, default 1); cuenta el MEJOR intento.
+ 10. Límite de tiempo total opcional por asignación (sin límite por defecto). Solo limita la entrega.
+ 11. Cuándo ve el estudiante las respuestas: configurable por asignación (al enviar, al cierre o nunca);
+     por defecto, al cierre.
+
+
+========================================================================================
+5. HISTORIAL DE SESIONES DE TRABAJO
+========================================================================================
+
+Sesión 0 – Consolidación
+  - Reglas de negocio de cursos, quices y usuarios en formularios reutilizables.
+  - Métricas y reglas de acceso de sesiones centralizadas en sessions_app/services.py.
+
+Sesión 1
+  - Recuperación de contraseña con token (24 h), email por consola en desarrollo. 11 pruebas. Pendiente: [S3].
+
+Sesión 2
+  - Reordenamiento con arrastrar y soltar. Pendiente: [Q1].
+  - Auditoría centralizada (quiz_platform/audit.py, audit.log rotativo de 5 MB con 3 respaldos).
+
+Sesión 3
+  - Pausa y reanudación de sesiones en vivo (se retira en la Fase 2).
+  - Inscripción con aprobación del docente (Enrollment: PENDIENTE, APROBADA, RECHAZADA).
+  - Preguntas con imagen, explicación e imagen de explicación.
+  - Exportación de resultados a PDF/XLSX con columnas ocultables (se adapta a Asignacion en la Fase 1).
+  - Docker: backend (gunicorn), frontend (nginx) y Postgres con volumen postgres_data.
+
+Sesión 4 (2026-10-01) – Auditoría y replanteamiento
+  - Revisión del código frente a este documento; errores catalogados en la sección 2.
+  - Cambio de enfoque a quiz normal; plan por fases; MODO_EN_VIVO.md para el futuro.
+
+5.1 Configuración para producción
+  - Email SMTP y API keys de IA solo por variables de entorno (.env sin versionar).
+  - audit.log fuera de BASE_DIR en el servidor.
+  - PASSWORD_RESET_TIMEOUT = 86400 (24 h).
+
+5.2 Pruebas manuales pendientes
+  1. docker compose up --build: migraciones aplicadas, static y media servidos.
+  2. Recrear el contenedor de la base de datos y confirmar que los datos persisten (solo se pierden
+     con docker compose down -v).
+  3. Flujo completo: generar un quiz desde un PDF real con Gemini -> verificar -> publicar ->
+     asignar con un límite de 5 min -> dos estudiantes lo responden (uno deja vencer el tiempo) ->
+     revisar resultados, exportar PDF/XLSX y ver el panel del admin.
+  4. Solicitar un curso, aprobarlo y confirmar que aparece el quiz asignado.
+
+
+========================================================================================
+6. INSTRUCCIONES PARA EL IMPLEMENTADOR (IA o persona)
+========================================================================================
+
+6.1 Proceso
+  - Implementa UNA fase por vez, en orden (0 -> 7). No adelantes trabajo de otras fases.
+  - NO implementes nada de MODO_EN_VIVO.md salvo que te lo pidan de forma explícita. Lo único
+    obligatorio de ese documento ya está incluido aquí (Asignacion.modo y servicios independientes del modo).
+  - Antes de terminar una fase, ejecuta desde backend/:
+        ../venv/Scripts/python.exe manage.py makemigrations
+        ../venv/Scripts/python.exe manage.py test
+    Todas las pruebas deben pasar. No debilites pruebas para que pasen; si una queda obsoleta por
+    este plan (por ejemplo, las de sessions_app en la Fase 2), elimínala o ajústala y explica por qué.
+  - Cada criterio de aceptación debe tener al menos una prueba automatizada.
+  - Al cerrar la fase, actualiza este archivo: marca las tareas con [HECHO], registra en la sección 5
+    los errores corregidos con la fecha y anota cualquier desviación del plan y su motivo.
+  - Si algo del plan es imposible o contradice el código, DETENTE y pregunta; no improvises.
+  - No versiones db.sqlite3, __pycache__, audit.log, media/, .env ni ninguna API key.
+  - No ejecutes comandos de git que modifiquen el historial (commit, tag, push) sin confirmación del usuario.
+
+6.2 Convenciones del proyecto
+  - Nombres de modelos, campos y mensajes al usuario en español.
+  - Control de acceso con @role_required('DOCENTE'|'ADMIN'|'ESTUDIANTE') de users/views.py.
+    Los objetos del docente se obtienen con get_object_or_404(..., creado_por=request.user) o
+    comprobando CourseTeacher.
+  - La lógica de negocio va en <app>/services.py; las vistas solo orquestan. Las validaciones de
+    formularios van en <app>/forms.py.
+  - Las acciones que modifican datos son POST con CSRF. Las APIs JSON devuelven {'error': msg} con el
+    código HTTP adecuado (400, 403 o 404).
+  - Mensajes al usuario con django.contrib.messages.
+  - Auditoría con quiz_platform.audit.log_action('ACCION', request.user, {...}).
+  - Plantillas: extienden la base existente y reutilizan sus clases y variables CSS. Sin frameworks
+    de frontend nuevos.
+  - Pruebas con django.test.TestCase en <app>/tests.py.
+  - Cada cambio de modelo lleva su migración. Las migraciones de datos usan apps.get_model().
+  - Fechas con timezone.now() (USE_TZ=True, America/Bogota).
+
+6.3 Cómo pedir el trabajo
+  "Implementa la FASE N de CAMBIOS.txt siguiendo la sección 6. Al terminar muestra la salida de las
+  pruebas y el resumen de cambios." Revisa el resultado antes de pedir la siguiente fase.

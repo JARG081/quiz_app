@@ -7,10 +7,12 @@ from quizzes.models import Quiz, Question, Option
 class QuizSession(models.Model):
     ESPERA = 'ESPERA'
     EN_CURSO = 'EN_CURSO'
+    PAUSADO = 'PAUSADO'
     FINALIZADO = 'FINALIZADO'
     ESTADO_CHOICES = [
         (ESPERA, 'En espera'),
         (EN_CURSO, 'En curso'),
+        (PAUSADO, 'Pausado'),
         (FINALIZADO, 'Finalizado'),
     ]
 
@@ -21,6 +23,8 @@ class QuizSession(models.Model):
     mostrando_resultados = models.BooleanField(default=False)
     pregunta_actual = models.IntegerField(default=0)  # 0 = no iniciado, 1..N = index
     ultima_pregunta_inicio = models.DateTimeField(null=True, blank=True)
+    pausa_inicio = models.DateTimeField(null=True, blank=True)
+    tiempo_pausa_acumulado = models.IntegerField(default=0)
     fecha_inicio = models.DateTimeField(null=True, blank=True)
     fecha_fin = models.DateTimeField(null=True, blank=True)
     codigo = models.CharField(max_length=8, unique=True, blank=True)
@@ -36,10 +40,13 @@ class QuizSession(models.Model):
 
     def tiempo_restante(self):
         """Calcula segundos restantes para la pregunta actual."""
-        if self.estado != self.EN_CURSO or not self.ultima_pregunta_inicio:
+        if self.estado not in (self.EN_CURSO, self.PAUSADO) or not self.ultima_pregunta_inicio:
             return 0
         elapsed = (timezone.now() - self.ultima_pregunta_inicio).total_seconds()
-        remaining = self.quiz.tiempo_por_pregunta - elapsed
+        paused_seconds = self.tiempo_pausa_acumulado
+        if self.estado == self.PAUSADO and self.pausa_inicio:
+            paused_seconds += (timezone.now() - self.pausa_inicio).total_seconds()
+        remaining = self.quiz.tiempo_por_pregunta - (elapsed - paused_seconds)
         return max(0, int(remaining))
 
     def pregunta_actual_obj(self):
@@ -60,6 +67,24 @@ class QuizSession(models.Model):
 
     def tiempo_agotado(self):
         return self.tiempo_restante() == 0 and self.estado == self.EN_CURSO
+
+    def pausar(self):
+        if self.estado != self.EN_CURSO:
+            return False
+        self.estado = self.PAUSADO
+        self.pausa_inicio = timezone.now()
+        self.save(update_fields=['estado', 'pausa_inicio'])
+        return True
+
+    def reanudar(self):
+        if self.estado != self.PAUSADO or not self.pausa_inicio:
+            return False
+        pausa_actual = int((timezone.now() - self.pausa_inicio).total_seconds())
+        self.tiempo_pausa_acumulado += pausa_actual
+        self.pausa_inicio = None
+        self.estado = self.EN_CURSO
+        self.save(update_fields=['estado', 'pausa_inicio', 'tiempo_pausa_acumulado'])
+        return True
 
     class Meta:
         ordering = ['-fecha_inicio', '-id']

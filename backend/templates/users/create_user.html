@@ -10,25 +10,34 @@
 <div class="card card-md">
     <form method="post" class="form-vertical">
         {% csrf_token %}
+        {% if form.errors %}
+        <div class="alert alert-danger" style="margin-bottom: 20px;">
+            Revisa los campos antes de continuar.
+        </div>
+        {% endif %}
         <div class="form-group">
             <label for="username">Nombre de usuario *</label>
-            <input type="text" id="username" name="username" class="form-control" required>
+            <input type="text" id="username" name="username" class="form-control" value="{{ form.username.value|default:'' }}" required>
+            {{ form.username.errors }}
         </div>
         <div class="form-group">
             <label for="email">Email</label>
-            <input type="email" id="email" name="email" class="form-control">
+            <input type="email" id="email" name="email" class="form-control" value="{{ form.email.value|default:'' }}">
+            {{ form.email.errors }}
         </div>
         <div class="form-group">
             <label for="password">Contraseña *</label>
             <input type="password" id="password" name="password" class="form-control" required>
+            {{ form.password.errors }}
         </div>
         <div class="form-group">
             <label for="role">Rol *</label>
             <select id="role" name="role" class="form-control">
-                <option value="ESTUDIANTE">Estudiante</option>
-                <option value="DOCENTE">Docente</option>
-                <option value="ADMIN">Admin</option>
+                {% for value, label in form.role.field.choices %}
+                <option value="{{ value }}" {% if form.role.value == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
             </select>
+            {{ form.role.errors }}
         </div>
         <div class="form-actions">
             <a href="{% url 'admin_dashboard' %}" class="btn btn-ghost">Cancelar</a>

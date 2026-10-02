@@ -1,9 +1,7 @@
 from django.shortcuts import render, get_object_or_404
-from django.db.models import Avg, Count, Q
 from users.views import role_required
-from courses.models import Enrollment, CourseTeacher
-from quizzes.models import Quiz
 from sessions_app.models import QuizSession, LiveAnswer, SessionParticipant
+from sessions_app.services import option_stats_for_question, student_correct_answers
 
 
 @role_required('ESTUDIANTE')
@@ -22,9 +20,7 @@ def student_stats(request):
         session = p.session
         quiz = session.quiz
         q_total = quiz.questions.count()
-        correct = LiveAnswer.objects.filter(
-            session=session, student=request.user, option__es_correcta=True
-        ).count()
+        correct = student_correct_answers(session, request.user)
         score = int(round(float(correct) / q_total * 100, 0)) if q_total > 0 else 0
         quiz_stats.append({
             'quiz': quiz,
@@ -72,12 +68,7 @@ def docente_stats(request):
         # Answer distribution per question
         question_data = []
         for q in quiz.questions.prefetch_related('options').order_by('orden'):
-            opts = []
-            total_votos_q = LiveAnswer.objects.filter(session=session, question=q).count()
-            for opt in q.options.order_by('letra'):
-                count = LiveAnswer.objects.filter(session=session, question=q, option=opt).count()
-                porcentaje = int(round(float(count) / total_votos_q * 100, 0)) if total_votos_q > 0 else 0
-                opts.append({'letra': opt.letra, 'texto': opt.texto, 'es_correcta': opt.es_correcta, 'votos': count, 'porcentaje': porcentaje, 'width_attr': f'style="width: {porcentaje}%;"'})
+            opts, _total_votos_q = option_stats_for_question(session, q)
             question_data.append({'enunciado': q.enunciado[:60], 'opciones': opts})
 
         quiz_stats.append({

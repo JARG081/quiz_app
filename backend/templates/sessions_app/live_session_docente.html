@@ -11,8 +11,15 @@
             <code>{{ session.codigo }}</code>
         </div>
         <div class="live-controls">
+            <button id="btn-pause" class="btn btn-secondary" onclick="togglePause()">Pausar ⏸</button>
             <button id="btn-next" class="btn btn-primary" onclick="nextQuestion()">Siguiente ▶</button>
             <button id="btn-end" class="btn btn-danger" onclick="endSession()">Finalizar ◼</button>
+        </div>
+    </div>
+
+    <div id="paused-banner" class="card hidden" style="margin-bottom: 16px; border-left: 4px solid #d97706;">
+        <div class="card-body">
+            <strong>Sesión pausada.</strong> El temporizador está detenido hasta reanudar.
         </div>
     </div>
 
@@ -81,6 +88,8 @@ const STATE_URL = `/sessions/${SESSION_ID}/api/state/`;
 const PARTICIPANTS_URL = `/sessions/${SESSION_ID}/api/participants/`;
 const RESULTS_URL = (q) => `/sessions/${SESSION_ID}/api/results/${q}/`;
 const NEXT_URL = `/sessions/${SESSION_ID}/next/`;
+const PAUSE_URL = `/sessions/${SESSION_ID}/pause/`;
+const RESUME_URL = `/sessions/${SESSION_ID}/resume/`;
 const END_URL = `/sessions/${SESSION_ID}/end/`;
 const FINAL_URL = `/sessions/${SESSION_ID}/results/`;
 
@@ -102,6 +111,11 @@ async function pollState() {
         const pct = state.quiz_tiempo ? (state.tiempo_restante / state.quiz_tiempo * 100) : 100;
         circle.className = 'timer-circle' + (state.tiempo_restante <= 5 ? ' timer-urgent' : '');
 
+        const paused = state.estado === 'PAUSADO';
+        document.getElementById('paused-banner').classList.toggle('hidden', !paused);
+        document.getElementById('btn-pause').textContent = paused ? 'Reanudar ▶' : 'Pausar ⏸';
+        document.getElementById('btn-next').disabled = paused;
+
         // Progress
         document.getElementById('q-progress').textContent =
             `Pregunta ${state.pregunta_actual} de ${state.total_preguntas}`;
@@ -111,7 +125,8 @@ async function pollState() {
             lastQuestion = state.pregunta.id;
             const q = state.pregunta;
             document.getElementById('question-display').innerHTML =
-                `<h2>${q.enunciado}</h2>
+                `${q.imagen ? `<div style="margin-bottom:12px;"><a href="${q.imagen}" target="_blank" rel="noopener" class="btn btn-sm btn-ghost">Ver imagen de apoyo</a></div>` : ''}
+                 <h2>${q.enunciado}</h2>
                  <div class="options-row">
                  ${q.opciones.map(o => `<span class="option-chip">${o.letra}. ${o.texto}</span>`).join('')}
                  </div>`;
@@ -144,6 +159,7 @@ async function expel(studentId) {
 let showingLadder = false;
 
 async function nextQuestion() {
+    if (document.getElementById('btn-next').disabled) return;
     if (!showingLadder) {
         // Mostrar ranking en vivo primero
         try {
@@ -178,6 +194,14 @@ async function executeNextQuestion() {
     } else if (data.finalizado) {
         window.location.href = FINAL_URL;
     }
+}
+
+async function togglePause() {
+    const paused = document.getElementById('btn-pause').textContent.startsWith('Reanudar');
+    const url = paused ? RESUME_URL : PAUSE_URL;
+    const res = await fetch(url, {method:'POST', headers:{'X-CSRFToken':CSRF}});
+    const data = await res.json();
+    if (!data.ok) console.error(data.error || 'No se pudo cambiar el estado de pausa');
 }
 
 async function forceNext() {

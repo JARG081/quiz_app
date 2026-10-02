@@ -15,6 +15,10 @@
         <span class="stat-number">{{ mis_cursos|length }}</span>
         <span class="stat-label">Cursos asignados</span>
     </div>
+    <div class="stat-card">
+        <span class="stat-number">{{ pending_requests_count }}</span>
+        <span class="stat-label">Solicitudes pendientes</span>
+    </div>
 </div>
 
 <div class="card">
@@ -46,6 +50,10 @@
     <a href="{% url 'quiz_list' %}" class="quick-link-card">
         <span class="ql-icon">📝</span>
         <span>Mis Quizzes</span>
+    </a>
+    <a href="{% url 'enrollment_requests' %}" class="quick-link-card">
+        <span class="ql-icon">🧑‍🎓</span>
+        <span>Solicitudes de curso</span>
     </a>
     <a href="{% url 'session_list' %}" class="quick-link-card">
         <span class="ql-icon">▶️</span>

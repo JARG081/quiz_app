@@ -7,23 +7,35 @@
     <h1>🔧 {{ quiz.titulo }}</h1>
     <div class="header-actions">
         <a href="{% url 'quiz_edit' quiz.pk %}" class="btn btn-secondary">Editar Info</a>
-        <form method="post" action="{% url 'toggle_publish' quiz.pk %}" style="display:inline">
+        <form method="post" action="{% url 'toggle_publish' quiz.pk %}" style="display:inline;">
             {% csrf_token %}
             {% if quiz.publicado %}
             <button type="submit" class="btn btn-warning">Despublicar</button>
             {% else %}
-            <button type="submit" class="btn btn-success" {% if not can_publish %}disabled title="Necesita entre 5 y 20 preguntas con 4 opciones y 1 correcta"{% endif %}>
+            {% if not can_publish %}
+            <button type="submit" class="btn btn-success" disabled title="Necesita entre 5 y 20 preguntas con 4 opciones y 1 correcta">
                 Publicar
             </button>
+            {% else %}
+            <button type="submit" class="btn btn-success">
+                Publicar
+            </button>
+            {% endif %}
             {% endif %}
         </form>
     </div>
 </div>
 
 <div class="builder-status">
-    <span class="status-pill {% if quiz.publicado %}status-published{% else %}status-draft{% endif %}">
-        {% if quiz.publicado %}✅ Publicado{% else %}📋 Borrador{% endif %}
+    {% if quiz.publicado %}
+    <span class="status-pill status-published">
+        ✅ Publicado
     </span>
+    {% else %}
+    <span class="status-pill status-draft">
+        📋 Borrador
+    </span>
+    {% endif %}
     <span class="status-info">{{ total }} preguntas | {{ quiz.tiempo_por_pregunta }}s por pregunta | Curso: {{ quiz.course.nombre }}</span>
     {% if not can_publish and not quiz.publicado %}
     <span class="status-warning">⚠️ Necesitas entre 5 y 20 preguntas para publicar (tienes {{ total }})</span>
@@ -35,7 +47,7 @@
     {% if not quiz.publicado %}
     <div class="card add-question-card" style="padding: 20px; margin-bottom: 40px; border: 2px dashed var(--border);">
         <h3 style="text-align:center; margin-bottom: 20px;">➕ Agregar Nueva Pregunta</h3>
-        <form method="post" action="{% url 'add_question' quiz.pk %}" class="builder-form">
+        <form method="post" action="{% url 'add_question' quiz.pk %}" enctype="multipart/form-data" class="builder-form">
             {% csrf_token %}
             
             <div class="form-group" style="margin-bottom: 20px;">
@@ -48,6 +60,21 @@
                     <input type="checkbox" name="es_vf" id="es_vf_toggle" onchange="toggleVF()" style="width:20px; height:20px;">
                     <span>Convertir en pregunta de Verdadero / Falso</span>
                 </label>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label style="font-weight:bold;">Imagen de apoyo opcional:</label>
+                <input type="file" name="imagen" class="form-control" accept="image/*">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label style="font-weight:bold;">Explicación opcional de la respuesta correcta:</label>
+                <textarea name="explicacion" class="form-control" rows="3" placeholder="Escribe una explicación breve para la respuesta correcta..."></textarea>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label style="font-weight:bold;">Imagen opcional para la explicación:</label>
+                <input type="file" name="explicacion_imagen" class="form-control" accept="image/*">
             </div>
 
             <div class="options-grid-edit" id="options-inputs" style="display:grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
@@ -126,17 +153,26 @@
 
     <!-- Questions List -->
     {% if questions %}
-    <div class="questions-list" style="display:flex; flex-direction:column; gap:30px;">
+    <div class="questions-list" id="questions-list" style="display:flex; flex-direction:column; gap:30px;">
         {% for q in questions %}
-        <div class="question-card" style="padding: 30px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 15px rgba(0,0,0,0.05); background: var(--bg-card);">
+        <div class="question-card" draggable="true" data-question-id="{{ q.pk }}" style="padding: 30px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 15px rgba(0,0,0,0.05); background: var(--bg-card); cursor: {% if not quiz.publicado %}move{% else %}default{% endif %};">
             <div class="question-header" style="text-align:center; margin-bottom: 25px;">
                 <span class="question-number" style="display:inline-block; padding:5px 15px; background:var(--primary); color:white; border-radius:20px; font-weight:bold; margin-bottom: 10px;">Pregunta {{ q.orden }}</span>
                 <h3 class="question-text" style="font-size: 1.5rem; margin:0; line-height:1.4;">{{ q.enunciado }}</h3>
+                {% if q.imagen %}
+                <div style="margin-top: 15px;">
+                    <a href="{{ q.imagen.url }}" target="_blank" rel="noopener" class="btn btn-sm btn-ghost">Ver imagen adjunta</a>
+                </div>
+                {% endif %}
             </div>
             
             <div class="options-grid-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px;">
                 {% for opt in q.options.all %}
-                <div class="option-chip {% if opt.es_correcta %}option-correct{% endif %}" style="margin:0; text-align:center; padding: 20px; border-radius:8px; display:flex; flex-direction:column; justify-content:center; align-items:center; border: 2px solid {% if opt.es_correcta %}#4CAF50{% else %}var(--border){% endif %};">
+                {% if opt.es_correcta %}
+                <div class="option-chip option-correct" style="margin:0; text-align:center; padding: 20px; border-radius:8px; display:flex; flex-direction:column; justify-content:center; align-items:center; border: 2px solid #4CAF50;">
+                {% else %}
+                <div class="option-chip" style="margin:0; text-align:center; padding: 20px; border-radius:8px; display:flex; flex-direction:column; justify-content:center; align-items:center; border: 2px solid var(--border);">
+                {% endif %}
                     <span style="font-size:1.2rem;"><strong>{{ opt.letra }}.</strong> {{ opt.texto }}</span>
                     {% if opt.es_correcta %}<span class="correct-mark" style="margin-top:10px; font-weight:bold; color:#4CAF50; display:inline-block; background:rgba(76,175,80,0.1); padding:4px 10px; border-radius:12px;">✓ Opción Correcta</span>{% endif %}
                 </div>
@@ -148,15 +184,102 @@
             {% if not quiz.publicado %}
             <div class="question-actions" style="text-align:center; padding-top:15px; border-top: 1px solid var(--border);">
                 <a href="{% url 'edit_question' quiz.pk q.pk %}" class="btn btn-secondary btn-square" style="border-radius:4px; padding:8px 20px;">Editar</a>
-                <form method="post" action="{% url 'delete_question' quiz.pk q.pk %}" style="display:inline">
+                <form method="post" action="{% url 'delete_question' quiz.pk q.pk %}" style="display:inline;">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-danger btn-square" style="border-radius:4px; padding:8px 20px;" onclick="return confirm('¿Eliminar esta pregunta?')">Eliminar</button>
                 </form>
             </div>
             {% endif %}
+
+            {% if q.explicacion or q.explicacion_imagen %}
+            <div style="margin-top: 20px; padding: 15px; border-radius: 8px; background: var(--bg-hover); border: 1px solid var(--border);">
+                <strong>Explicación:</strong>
+                {% if q.explicacion %}
+                <p style="margin: 10px 0 0 0;">{{ q.explicacion }}</p>
+                {% endif %}
+                {% if q.explicacion_imagen %}
+                <div style="margin-top: 10px;">
+                    <a href="{{ q.explicacion_imagen.url }}" target="_blank" rel="noopener" class="btn btn-sm btn-ghost">Ver imagen de explicación</a>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
         </div>
         {% endfor %}
     </div>
+
+    <script>
+    // Drag & Drop para reordenar preguntas
+    let draggedElement = null;
+    const questionsList = document.getElementById('questions-list');
+    const quizId = '{{ quiz.pk }}';
+    const isPublished = {{ quiz.publicado|lower }};
+
+    if (!isPublished && questionsList) {
+        questionsList.addEventListener('dragstart', (e) => {
+            draggedElement = e.target.closest('.question-card');
+            draggedElement.style.opacity = '0.5';
+        });
+
+        questionsList.addEventListener('dragend', (e) => {
+            draggedElement.style.opacity = '1';
+            draggedElement = null;
+        });
+
+        questionsList.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            const afterElement = getDragAfterElement(questionsList, e.clientY);
+            if (afterElement == null) {
+                questionsList.appendChild(draggedElement);
+            } else {
+                questionsList.insertBefore(draggedElement, afterElement);
+            }
+        });
+
+        questionsList.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            await saveNewOrder();
+        });
+
+        function getDragAfterElement(container, y) {
+            const draggableElements = [...container.querySelectorAll('.question-card:not([style*="opacity: 0.5"])')];
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+                if (offset < 0 && offset > closest.offset) {
+                    return { offset: offset, element: child };
+                } else {
+                    return closest;
+                }
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+
+        async function saveNewOrder() {
+            const cards = questionsList.querySelectorAll('.question-card');
+            const newOrder = Array.from(cards).map(card => parseInt(card.dataset.questionId));
+            
+            try {
+                const response = await fetch(`/quizzes/${quizId}/questions/reorder/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''
+                    },
+                    body: JSON.stringify({ order: newOrder })
+                });
+
+                const result = await response.json();
+                if (!result.success) {
+                    console.error('Error al reordenar:', result.message);
+                    location.reload();
+                }
+            } catch (error) {
+                console.error('Error en la solicitud:', error);
+                location.reload();
+            }
+        }
+    }
+    </script>
     {% else %}
     <div class="empty-state">
         <p>Aún no hay preguntas. Agrega la primera arriba.</p>

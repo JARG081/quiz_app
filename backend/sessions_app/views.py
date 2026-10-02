@@ -1,14 +1,26 @@
 import json
+from io import BytesIO
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.http import JsonResponse
-from django.views.decorators.http import require_POST
+from django.http import JsonResponse, HttpResponse
+from django.views.decorators.http import require_POST, require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 from users.views import role_required
-from courses.models import CourseTeacher, Enrollment
 from quizzes.models import Quiz
 from .models import QuizSession, SessionParticipant, LiveAnswer
+from .services import (
+    active_session_for_teacher,
+    get_session_by_code,
+    option_stats_for_question,
+    pause_session,
+    resume_session,
+    session_can_accept_student,
+    session_participant_results,
+    session_leaderboard,
+    student_correct_answers,
+    teacher_can_access_quiz,
+)
 
 
 # ─── Helper ──────────────────────────────────────────────────────────────────
@@ -43,9 +55,7 @@ def _auto_advance_if_needed(session):
 @role_required('DOCENTE')
 def create_session(request):
     # Rule: One active session per teacher
-    active_session = QuizSession.objects.filter(
-        docente=request.user, estado__in=[QuizSession.ESPERA, QuizSession.EN_CURSO]
-    ).first()
+    active_session = active_session_for_teacher(request.user)
     
     if active_session:
         messages.warning(request, 'Ya tienes una sesión activa. Termínala primero para empezar un nuevo Quiz.')
@@ -54,12 +64,9 @@ def create_session(request):
         return redirect('waiting_room_docente', session_id=active_session.pk)
 
     if request.method == 'POST':
-        from courses.models import CourseTeacher
         quiz_id = request.POST.get('quiz_id')
         quiz = get_object_or_404(Quiz, pk=quiz_id, publicado=True)
-        
-        mis_cursos = [ct.course for ct in CourseTeacher.objects.filter(teacher=request.user)]
-        if quiz.course not in mis_cursos:
+        if not teacher_can_access_quiz(request.user, quiz):
             messages.error(request, 'No tienes acceso a ese quiz.')
             return redirect('quiz_list')
 
@@ -96,26 +103,14 @@ def live_session_docente(request, session_id):
 def join_session(request):
     if request.method == 'POST':
         codigo = request.POST.get('codigo', '').strip().upper()
-        try:
-            session = QuizSession.objects.get(codigo=codigo)
-        except QuizSession.DoesNotExist:
+        session = get_session_by_code(codigo)
+        if not session:
             messages.error(request, 'Código de sesión no encontrado.')
             return redirect('estudiante_dashboard')
 
-        if session.estado == QuizSession.FINALIZADO:
-            messages.error(request, 'Esta sesión ya finalizó.')
-            return redirect('estudiante_dashboard')
-
-        if not session.permitir_ingreso:
-            messages.error(request, 'El ingreso está cerrado.')
-            return redirect('estudiante_dashboard')
-
-        # Check enrollment
-        enrolled = Enrollment.objects.filter(
-            course=session.quiz.course, student=request.user
-        ).exists()
-        if not enrolled:
-            messages.error(request, 'No estás inscrito en el curso de este quiz.')
+        can_join, join_message = session_can_accept_student(session, request.user)
+        if not can_join:
+            messages.error(request, join_message)
             return redirect('estudiante_dashboard')
 
         participant, created = SessionParticipant.objects.get_or_create(
@@ -129,7 +124,7 @@ def join_session(request):
         participant.activo = True
         participant.save()
 
-        if session.estado == QuizSession.EN_CURSO:
+        if session.estado in (QuizSession.EN_CURSO, QuizSession.PAUSADO):
             return redirect('live_session_estudiante', session_id=session.pk)
         return redirect('waiting_room_estudiante', session_id=session.pk)
 
@@ -206,6 +201,7 @@ def session_state_api(request, session_id):
         'estado': session.estado,
         'pregunta_actual': session.pregunta_actual,
         'total_preguntas': session.total_preguntas(),
+        'quiz_tiempo': session.quiz.tiempo_por_pregunta,
         'tiempo_restante': session.tiempo_restante(),
         'participant_count': participant_count,
         'answers_count': answers_count,
@@ -231,6 +227,7 @@ def session_state_api(request, session_id):
             'id': pregunta_obj.pk,
             'enunciado': pregunta_obj.enunciado,
             'orden': pregunta_obj.orden,
+            'imagen': pregunta_obj.imagen.url if pregunta_obj.imagen else None,
             'opciones': [
                 {'id': o.pk, 'letra': o.letra, 'texto': o.texto}
                 for o in pregunta_obj.options.order_by('letra')
@@ -277,22 +274,7 @@ def results_api(request, session_id, question_orden):
         return JsonResponse({'error': 'Pregunta no encontrada'}, status=404)
 
     question = questions[idx]
-    options = question.options.order_by('letra')
-
-    total_answers = LiveAnswer.objects.filter(session=session, question=question).count()
-    result = []
-    for opt in options:
-        count = LiveAnswer.objects.filter(session=session, question=question, option=opt).count()
-        porcentaje = int(round(float(count) / total_answers * 100, 0)) if total_answers > 0 else 0
-        result.append({
-            'letra': opt.letra,
-            'texto': opt.texto,
-            'es_correcta': opt.es_correcta,
-            'votos': count,
-            'porcentaje': porcentaje,
-            'width_attr': f'style="width: {porcentaje}%;"',
-        })
-
+    result, total_answers = option_stats_for_question(session, question)
     return JsonResponse({'opciones': result, 'total': total_answers})
 
 
@@ -376,12 +358,33 @@ def end_session(request, session_id):
     return JsonResponse({'ok': True})
 
 
+@require_POST
+@role_required('DOCENTE')
+def pause_session_view(request, session_id):
+    session = get_object_or_404(QuizSession, pk=session_id, docente=request.user)
+    if not pause_session(session):
+        return JsonResponse({'error': 'La sesión no se puede pausar.'}, status=400)
+    return JsonResponse({'ok': True, 'estado': session.estado})
+
+
+@require_POST
+@role_required('DOCENTE')
+def resume_session_view(request, session_id):
+    session = get_object_or_404(QuizSession, pk=session_id, docente=request.user)
+    if not resume_session(session):
+        return JsonResponse({'error': 'La sesión no se puede reanudar.'}, status=400)
+    return JsonResponse({'ok': True, 'estado': session.estado})
+
+
 # ─── Estudiante Actions ───────────────────────────────────────────────────────
 
 @require_POST
 @role_required('ESTUDIANTE')
 def submit_answer(request, session_id):
     session = get_object_or_404(QuizSession, pk=session_id)
+
+    if session.estado == QuizSession.PAUSADO:
+        return JsonResponse({'error': 'La sesión está pausada.'}, status=400)
 
     if session.estado != QuizSession.EN_CURSO:
         return JsonResponse({'error': 'Sesión no activa.'}, status=400)
@@ -434,22 +437,8 @@ def submit_answer(request, session_id):
 
 def leaderboard_api(request, session_id):
     """Devuelve el leaderboard parcial de toda la sesión (top 6 puntajes altos)."""
-    from django.db.models import Sum
     session = get_object_or_404(QuizSession, pk=session_id)
-    
-    ranking = LiveAnswer.objects.filter(session=session).values(
-        'student__username', 'student__pk'
-    ).annotate(total_score=Sum('puntaje')).order_by('-total_score')[:6]
-    
-    data = []
-    for i, r in enumerate(ranking):
-        data.append({
-            'posicion': i + 1,
-            'username': r['student__username'],
-            'score': r['total_score'] or 0
-        })
-        
-    return JsonResponse({'ranking': data})
+    return JsonResponse({'ranking': session_leaderboard(session)})
 
 
 # ─── Session Results ──────────────────────────────────────────────────────────
@@ -457,42 +446,158 @@ def leaderboard_api(request, session_id):
 def session_results(request, session_id):
     session = get_object_or_404(QuizSession, pk=session_id)
     questions = list(session.quiz.questions.prefetch_related('options').order_by('orden'))
+    hidden_columns = [item for item in request.GET.get('hide', '').split(',') if item]
+    participant_results = session_participant_results(session)
 
     results = []
     for q in questions:
-        opts = []
-        total_votos_q = LiveAnswer.objects.filter(session=session, question=q).count()
-        for opt in q.options.order_by('letra'):
-            count = LiveAnswer.objects.filter(session=session, question=q, option=opt).count()
-            porcentaje = int(round(float(count) / total_votos_q * 100, 0)) if total_votos_q > 0 else 0
-            opts.append({'letra': opt.letra, 'texto': opt.texto, 'es_correcta': opt.es_correcta, 'votos': count, 'porcentaje': porcentaje, 'width_attr': f'style="width: {porcentaje}%;"'})
+        opts, _total_votos_q = option_stats_for_question(session, q)
         results.append({'pregunta': q, 'opciones': opts})
 
     # Student score
     student_score = None
     if request.user.is_authenticated and hasattr(request.user, 'profile'):
         if request.user.profile.role == 'ESTUDIANTE':
-            correct = LiveAnswer.objects.filter(
-                session=session, student=request.user, option__es_correcta=True
-            ).count()
+            correct = student_correct_answers(session, request.user)
             student_score = {'correctas': correct, 'total': len(questions)}
-
-    from django.db.models import Sum
-    ranking_data = LiveAnswer.objects.filter(session=session).values(
-        'student__username'
-    ).annotate(total_score=Sum('puntaje')).order_by('-total_score')[:5]
-    
-    leaderboard = []
-    for i, r in enumerate(ranking_data):
-        leaderboard.append({
-            'posicion': i + 1,
-            'username': r['student__username'],
-            'score': r['total_score'] or 0
-        })
 
     return render(request, 'sessions_app/session_results.html', {
         'session': session,
         'results': results,
         'student_score': student_score,
-        'leaderboard': leaderboard,
+        'leaderboard': session_leaderboard(session, limit=5),
+        'participant_results': participant_results,
+        'hidden_columns': hidden_columns,
     })
+
+
+@require_http_methods(['GET'])
+@role_required('DOCENTE')
+def export_results_xlsx(request, session_id):
+    session = get_object_or_404(QuizSession, pk=session_id, docente=request.user)
+    hidden_columns = [item for item in request.GET.get('hide', '').split(',') if item]
+    participant_results = session_participant_results(session)
+    questions = list(session.quiz.questions.prefetch_related('options').order_by('orden'))
+
+    try:
+        from openpyxl import Workbook
+    except ImportError:
+        messages.error(request, 'Falta instalar openpyxl para exportar a XLSX.')
+        return redirect('session_results', session_id=session_id)
+
+    workbook = Workbook()
+    summary_sheet = workbook.active
+    summary_sheet.title = 'Resumen'
+    summary_sheet.append(['Quiz', session.quiz.titulo])
+    summary_sheet.append(['Sesión', session.codigo])
+    summary_sheet.append(['Participantes', len(participant_results)])
+    summary_sheet.append(['Preguntas', len(questions)])
+
+    participant_sheet = workbook.create_sheet('Participantes')
+    columns = [
+        ('username', 'Estudiante'),
+        ('score', 'Puntaje'),
+        ('correctas', 'Correctas'),
+        ('respondidas', 'Respondidas'),
+        ('porcentaje', '% Acierto'),
+    ]
+    visible_columns = [column for column in columns if column[0] not in hidden_columns]
+    participant_sheet.append([label for _, label in visible_columns])
+    for row in participant_results:
+        participant_sheet.append([row[key] for key, _ in visible_columns])
+
+    question_sheet = workbook.create_sheet('Preguntas')
+    question_sheet.append(['Orden', 'Pregunta', 'Correcta', 'Explicación'])
+    for question in questions:
+        correct = question.correct_option()
+        question_sheet.append([
+            question.orden,
+            question.enunciado,
+            correct.letra if correct else '',
+            question.explicacion or '',
+        ])
+
+    output = BytesIO()
+    workbook.save(output)
+    output.seek(0)
+    response = HttpResponse(
+        output.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = f'attachment; filename="quiz-{session.codigo}-resultados.xlsx"'
+    return response
+
+
+@require_http_methods(['GET'])
+@role_required('DOCENTE')
+def export_results_pdf(request, session_id):
+    session = get_object_or_404(QuizSession, pk=session_id, docente=request.user)
+    hidden_columns = [item for item in request.GET.get('hide', '').split(',') if item]
+    participant_results = session_participant_results(session)
+    questions = list(session.quiz.questions.prefetch_related('options').order_by('orden'))
+
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib.units import cm
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    except ImportError:
+        messages.error(request, 'Falta instalar reportlab para exportar a PDF.')
+        return redirect('session_results', session_id=session_id)
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=1.5 * cm, leftMargin=1.5 * cm, topMargin=1.5 * cm, bottomMargin=1.5 * cm)
+    styles = getSampleStyleSheet()
+    story = []
+
+    story.append(Paragraph(f'Resultados del quiz: {session.quiz.titulo}', styles['Title']))
+    story.append(Paragraph(f'Sesión: {session.codigo}', styles['Normal']))
+    story.append(Paragraph(f'Participantes: {len(participant_results)} | Preguntas: {len(questions)}', styles['Normal']))
+    story.append(Spacer(1, 12))
+
+    participant_columns = [
+        ('username', 'Estudiante'),
+        ('score', 'Puntaje'),
+        ('correctas', 'Correctas'),
+        ('respondidas', 'Respondidas'),
+        ('porcentaje', '% Acierto'),
+    ]
+    visible_columns = [column for column in participant_columns if column[0] not in hidden_columns]
+    if visible_columns:
+        table_data = [[label for _, label in visible_columns]]
+        for row in participant_results:
+            table_data.append([str(row[key]) for key, _ in visible_columns])
+        table = Table(table_data, repeatRows=1)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f3c88')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ]))
+        story.append(Paragraph('Participantes', styles['Heading2']))
+        story.append(table)
+        story.append(Spacer(1, 12))
+
+    story.append(Paragraph('Preguntas', styles['Heading2']))
+    for question in questions:
+        correct = question.correct_option()
+        table = Table([
+            ['Orden', 'Pregunta', 'Correcta', 'Explicación'],
+            [str(question.orden), question.enunciado, correct.letra if correct else '', question.explicacion or ''],
+        ], repeatRows=1)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4b5563')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ]))
+        story.append(table)
+        story.append(Spacer(1, 10))
+
+    doc.build(story)
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="quiz-{session.codigo}-resultados.pdf"'
+    response.write(buffer.getvalue())
+    buffer.close()
+    return response

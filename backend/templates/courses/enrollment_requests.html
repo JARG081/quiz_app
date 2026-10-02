@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block title %}Solicitudes de Curso – QuizLive{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <a href="{% url 'docente_dashboard' %}" class="btn btn-ghost">← Panel docente</a>
+    <h1>🧑‍🎓 Solicitudes de curso</h1>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if requests %}
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Curso</th>
+                        <th>Estudiante</th>
+                        <th>Solicitado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for request in requests %}
+                    <tr>
+                        <td>{{ request.course.nombre }}</td>
+                        <td>{{ request.student.username }}</td>
+                        <td>{{ request.fecha_inscripcion|date:'Y-m-d H:i' }}</td>
+                        <td class="actions">
+                            <form method="post" action="{% url 'approve_enrollment_request' request.pk %}" style="display:inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-success">Aprobar</button>
+                            </form>
+                            <form method="post" action="{% url 'reject_enrollment_request' request.pk %}" style="display:inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-danger">Rechazar</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No hay solicitudes pendientes.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

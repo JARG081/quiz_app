@@ -11,6 +11,8 @@ urlpatterns = [
     path('<int:session_id>/live/', views.live_session_docente, name='live_session_docente'),
     path('<int:session_id>/start/', views.start_session, name='start_session'),
     path('<int:session_id>/next/', views.next_question, name='next_question'),
+    path('<int:session_id>/pause/', views.pause_session_view, name='pause_session'),
+    path('<int:session_id>/resume/', views.resume_session_view, name='resume_session'),
     path('<int:session_id>/close-admission/', views.close_admission, name='close_admission'),
     path('<int:session_id>/end/', views.end_session, name='end_session'),
     path('<int:session_id>/expel/<int:student_id>/', views.expel_student, name='expel_student'),
@@ -22,6 +24,8 @@ urlpatterns = [
 
     # Shared
     path('<int:session_id>/results/', views.session_results, name='session_results'),
+    path('<int:session_id>/results/pdf/', views.export_results_pdf, name='export_results_pdf'),
+    path('<int:session_id>/results/xlsx/', views.export_results_xlsx, name='export_results_xlsx'),
 
     # Polling API
     path('<int:session_id>/api/state/', views.session_state_api, name='session_state_api'),

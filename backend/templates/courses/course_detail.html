@@ -69,6 +69,18 @@
                 </select>
                 <button type="submit" class="btn btn-primary">Inscribir</button>
             </form>
+
+            {% if pending_requests %}
+            <div class="mt-8">
+                <h3>Solicitudes pendientes ({{ pending_requests|length }})</h3>
+                {% for request in pending_requests %}
+                <div class="person-row">
+                    <span>{{ request.student.username }}</span>
+                    <span class="text-muted">Pendiente de aprobación</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
