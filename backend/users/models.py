@@ -16,9 +16,18 @@ class Profile(models.Model):
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     role = models.CharField(max_length=15, choices=ROLE_CHOICES, default=ESTUDIANTE)
+    alias = models.CharField(max_length=50, blank=True, null=True)
 
     def __str__(self):
-        return f'{self.user.username} ({self.role})'
+        return f'{self.display_name()} ({self.role})'
+
+    def display_name(self):
+        if self.alias and self.alias.strip():
+            return self.alias.strip()
+        full_name = self.user.get_full_name().strip()
+        if full_name:
+            return full_name
+        return self.user.username
 
     def is_admin(self):
         return self.role == self.ADMIN

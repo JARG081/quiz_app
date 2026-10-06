@@ -4,7 +4,29 @@
 {% block content %}
 <div class="page-header">
     <h1>🧑‍💻 Panel del Estudiante</h1>
-    <a href="{% url 'join_session' %}" class="btn btn-primary">🎯 Unirse a Sesión</a>
+</div>
+
+<div class="card">
+    <div class="card-header"><h2>Quices pendientes</h2></div>
+    <div class="card-body">
+        {% for assignment in quices_pendientes %}
+        <div class="person-row"><div><strong>{{ assignment.quiz.titulo }}</strong><br><span class="text-muted">{{ assignment.quiz.course.nombre }} · Cierra {{ assignment.cierra_en }}</span></div><form method="post" action="{% url 'start_attempt' assignment.pk %}">{% csrf_token %}<button class="btn btn-primary" type="submit">Iniciar ({{ assignment.intentos_usados }}/{{ assignment.intentos_permitidos }})</button></form></div>
+        {% empty %}<div class="empty-state"><p>No tienes quices pendientes.</p></div>{% endfor %}
+    </div>
+</div>
+
+<div class="card" style="margin-top:24px">
+    <div class="card-header"><h2>En progreso</h2></div>
+    <div class="card-body">
+        {% for attempt in intentos_en_progreso %}<div class="person-row"><div><strong>{{ attempt.asignacion.quiz.titulo }}</strong><br><span class="text-muted">Intento {{ attempt.numero }}</span></div><a class="btn btn-primary" href="{% url 'attempt_view' attempt.pk %}">Continuar</a></div>{% empty %}<div class="empty-state"><p>No tienes intentos en progreso.</p></div>{% endfor %}
+    </div>
+</div>
+
+<div class="card" style="margin-top:24px">
+    <div class="card-header"><h2>Completados</h2></div>
+    <div class="card-body">
+        {% for attempt in quices_completados %}<div class="person-row"><div><strong>{{ attempt.assignment.quiz.titulo }}</strong><br><span class="text-muted">{{ attempt.correctas }}/{{ attempt.total }} aciertos · {{ attempt.nota }}%</span></div><a class="btn btn-secondary" href="{% url 'attempt_review' attempt.pk %}">Revisar</a></div>{% empty %}<div class="empty-state"><p>Aún no has completado quices.</p></div>{% endfor %}
+    </div>
 </div>
 
 <div class="stats-row">

@@ -3,6 +3,7 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.db.models import Count, Q
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 from users.views import role_required
 from .models import Course, CourseTeacher, Enrollment
 from .forms import CourseForm
@@ -85,6 +86,7 @@ def assign_teacher(request, course_id):
 
 
 @role_required('ADMIN')
+@require_POST
 def remove_teacher(request, course_id, teacher_id):
     CourseTeacher.objects.filter(course_id=course_id, teacher_id=teacher_id).delete()
     messages.success(request, 'Docente removido.')
@@ -149,6 +151,7 @@ def reject_enrollment_request(request, enrollment_id):
 
 
 @role_required('ADMIN')
+@require_POST
 def unenroll_student(request, course_id, student_id):
     Enrollment.objects.filter(course_id=course_id, student_id=student_id).delete()
     messages.success(request, 'Estudiante removido.')

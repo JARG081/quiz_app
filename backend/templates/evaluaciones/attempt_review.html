@@ -1,0 +1,7 @@
+{% extends 'base.html' %}
+{% block title %}Revisión del intento{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Resultado: {{ attempt.asignacion.quiz.titulo }}</h1><a href="{% url 'estudiante_dashboard' %}" class="btn btn-ghost">Volver al panel</a></div>
+<div class="stats-row"><div class="stat-card"><span class="stat-number">{{ attempt.nota }}%</span><span class="stat-label">Nota</span></div><div class="stat-card"><span class="stat-number">{{ attempt.correctas }}/{{ attempt.total }}</span><span class="stat-label">Aciertos</span></div></div>
+{% if show_answers %}<div class="card"><div class="card-body">{% for answer in answers %}<div style="margin-bottom:20px"><h2>{{ answer.question.orden }}. {{ answer.question.enunciado }}</h2><p>Marcaste: {% if answer.option %}{{ answer.option.letra }}. {{ answer.option.texto }}{% else %}Sin responder{% endif %}</p><p>Resultado: {% if answer.es_correcta %}Correcta{% else %}Incorrecta{% endif %}</p><p>{{ answer.question.explicacion }}</p></div>{% endfor %}</div></div>{% elif attempt.asignacion.mostrar_respuestas == 'AL_CIERRE' %}<div class="alert alert-info">Las respuestas se mostrarán al cierre.</div>{% else %}<div class="alert alert-info">Las respuestas no se mostrarán.</div>{% endif %}
+{% endblock %}

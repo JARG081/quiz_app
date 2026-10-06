@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% load eval_tags %}
+{% block title %}Resolver quiz{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>{{ attempt.asignacion.quiz.titulo }}</h1><p class="text-muted">Intento {{ attempt.numero }}</p></div><div id="countdown" data-limit="{{ attempt.limite_en|date:'c' }}"></div></div>
+<form method="post" action="{% url 'submit_attempt' attempt.pk %}" id="attempt-form">
+    {% csrf_token %}
+    {% for question in questions %}<div class="card" style="margin-bottom:20px"><div class="card-body"><h2>{{ question.orden }}. {{ question.enunciado }}</h2>{% if question.imagen %}<img src="{{ question.imagen.url }}" alt="Imagen de la pregunta" style="max-width:100%">{% endif %}<div class="option-list">{% for option in question.options.all %}<label><input type="radio" name="question-{{ question.pk }}" value="{{ option.pk }}" data-question="{{ question.pk }}" {% if answered|get_item:question.pk == option.pk %}checked{% endif %}> {{ option.letra }}. {{ option.texto }}</label>{% endfor %}</div></div></div>{% endfor %}
+    <button type="submit" class="btn btn-primary">Enviar intento</button>
+</form>
+{% endblock %}
+{% block extra_js %}<script>
+const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+document.querySelectorAll('input[type=radio]').forEach((input) => input.addEventListener('change', async () => {
+    const response = await fetch('{% url 'answer_attempt' attempt.pk %}', {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body:JSON.stringify({question_id:input.dataset.question, option_id:input.value})});
+    if (!response.ok) input.checked = false;
+}));
+const countdown = document.getElementById('countdown');
+const limit = countdown.dataset.limit;
+if (limit) { const until = new Date(limit).getTime(); const timer = setInterval(() => { const seconds = Math.max(0, Math.floor((until-Date.now())/1000)); countdown.textContent = `Tiempo restante: ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`; if (!seconds) { clearInterval(timer); document.getElementById('attempt-form').submit(); } }, 1000); }
+</script>{% endblock %}

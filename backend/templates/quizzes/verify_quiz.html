@@ -1,0 +1,6 @@
+{% extends 'base.html' %}
+{% block title %}Verificar quiz{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>Resolver verificación</h1><p class="text-muted">{{ quiz.titulo }}</p></div><a href="{% url 'quiz_builder' quiz.pk %}" class="btn btn-ghost">Volver</a></div>
+<form method="post">{% csrf_token %}{% for question in questions %}<div class="card" style="margin-bottom:20px"><div class="card-body"><h2>{{ question.orden }}. {{ question.enunciado }}</h2>{% if question.imagen %}<img src="{{ question.imagen.url }}" alt="Imagen de la pregunta" style="max-width:100%">{% endif %}{% for option in question.options.all %}<label style="display:block;margin:12px 0"><input type="radio" name="question_{{ question.pk }}" value="{{ option.pk }}"> {{ option.letra }}. {{ option.texto }}</label>{% endfor %}</div></div>{% endfor %}<button type="submit" class="btn btn-primary">Enviar verificación</button></form>
+{% endblock %}

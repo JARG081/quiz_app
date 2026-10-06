@@ -1,54 +1,7 @@
 {% extends 'base.html' %}
-{% block title %}Estadísticas Docente – QuizLive{% endblock %}
-
+{% block title %}Estadísticas Docente{% endblock %}
 {% block content %}
-<div class="page-header">
-    <h1>📊 Estadísticas</h1>
-    <a href="{% url 'docente_dashboard' %}" class="btn btn-ghost">← Inicio</a>
-</div>
-
-{% if quiz_stats %}
-{% for item in quiz_stats %}
-<div class="card stats-session-card">
-    <div class="card-header">
-        <div>
-            <h2>{{ item.quiz.titulo }}</h2>
-            <span class="text-muted">{{ item.quiz.course.nombre }} · Sesión {{ item.session.codigo }} · {{ item.session.fecha_fin|date:"d/m/Y H:i"|default:"" }}</span>
-        </div>
-        <div class="session-summary-stats">
-            <span class="stat-pill">👥 {{ item.participantes }} participantes</span>
-            <span class="stat-pill">📈 Promedio {{ item.avg_score }}%</span>
-        </div>
-    </div>
-    <div class="card-body">
-        {% for qd in item.pregunta_data %}
-        <div class="question-stat">
-            <p class="q-enunciado">{{ forloop.counter }}. {{ qd.enunciado }}</p>
-            <div class="option-bars">
-                {% for opt in qd.opciones %}
-                <div class="option-bar-row {% if opt.es_correcta %}correct-row{% endif %}">
-                    <span class="opt-letter">{{ opt.letra }}</span>
-                    <div class="bar-track">
-                        <div class="bar-fill {% if opt.es_correcta %}bar-correct{% endif %}"
-                             {{ opt.width_attr|safe }}
-                             title="{{ opt.votos }} votos ({{ opt.porcentaje }}%)">
-                        </div>
-                    </div>
-                    <span class="opt-votes">{{ opt.votos }} ({{ opt.porcentaje }}%)</span>
-                    {% if opt.es_correcta %}<span class="correct-mark">✓</span>{% endif %}
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% endfor %}
-        <a href="{% url 'session_results' item.session.pk %}" class="btn btn-sm btn-ghost">Ver resultados completos</a>
-    </div>
-</div>
-{% endfor %}
-{% else %}
-<div class="empty-state card">
-    <p>Aún no tienes sesiones finalizadas con estadísticas.</p>
-    <a href="{% url 'create_session' %}" class="btn btn-primary">Lanzar primera sesión</a>
-</div>
-{% endif %}
+<div class="page-header"><h1>📊 Estadísticas</h1><a href="{% url 'docente_dashboard' %}" class="btn btn-ghost">← Inicio</a></div>
+<form method="get" class="card" style="padding:16px;margin-bottom:24px"><label for="course">Curso</label><select id="course" name="course"><option value="">Todos</option>{% for course in mis_cursos %}<option value="{{ course.pk }}" {% if selected_course == course.pk|stringformat:'s' %}selected{% endif %}>{{ course.nombre }}</option>{% endfor %}</select><button class="btn btn-secondary" type="submit">Filtrar</button></form>
+{% if quiz_stats %}{% for item in quiz_stats %}<div class="card stats-session-card"><div class="card-header"><div><h2>{{ item.quiz.titulo }}</h2><span class="text-muted">{{ item.quiz.course.nombre }} · {{ item.participantes }}/{{ item.inscritos }} enviados</span></div><span class="stat-pill">Promedio {{ item.avg_score }}%</span></div><div class="card-body">{% for qd in item.pregunta_data %}<div class="question-stat"><p class="q-enunciado">{{ forloop.counter }}. {{ qd.enunciado }} · {{ qd.correctas }}/{{ qd.total }} aciertos</p><div class="option-bars">{% for opt in qd.opciones %}<div class="option-bar-row {% if opt.es_correcta %}correct-row{% endif %}"><span class="opt-letter">{{ opt.letra }}</span><div class="bar-track"><div class="bar-fill {% if opt.es_correcta %}bar-correct{% endif %}" {{ opt.width_attr|safe }}></div></div><span class="opt-votes">{{ opt.votos }} ({{ opt.porcentaje }}%)</span></div>{% endfor %}</div></div>{% endfor %}</div></div>{% endfor %}{% else %}<div class="empty-state card"><p>Aún no tienes asignaciones con intentos enviados.</p></div>{% endif %}
 {% endblock %}

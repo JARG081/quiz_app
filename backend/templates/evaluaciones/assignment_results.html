@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+{% block title %}Resultados{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>{{ assignment.quiz.titulo }}</h1><p class="text-muted">{{ assignment.quiz.course.nombre }} · {{ assignment.estado }}</p></div><a href="{% url 'assignment_list' %}" class="btn btn-ghost">Volver</a></div>
+<div class="card"><div class="card-header"><h2>Estudiantes inscritos</h2></div><div class="card-body"><table class="data-table"><thead><tr><th>Estudiante</th><th>Estado</th><th>Intentos</th><th>Mejor nota</th><th>Enviado</th></tr></thead><tbody>
+{% for row in rows %}<tr><td>{{ row.student.username }}</td><td>{{ row.estado }}</td><td>{{ row.intentos }}</td><td>{% if row.mejor %}{{ row.mejor.nota }}%{% else %}-{% endif %}</td><td>{{ row.ultimo_envio|default:'-' }}</td></tr>{% empty %}<tr><td colspan="5">No hay estudiantes aprobados en el curso.</td></tr>{% endfor %}
+</tbody></table></div></div>
+<div class="card" style="margin-top:24px"><div class="card-header"><h2>Acierto por pregunta</h2></div><div class="card-body">{% for item in question_stats %}<p><strong>{{ item.question.orden }}. {{ item.question.enunciado }}</strong>: {{ item.correctas }}/{{ item.total }}</p>{% empty %}<p>No hay intentos enviados.</p>{% endfor %}</div></div>
+<div class="quick-links"><form method="post" action="{% url 'assignment_close' assignment.pk %}">{% csrf_token %}<button class="btn btn-warning" type="submit">Cerrar asignación</button></form><form method="post" action="{% url 'assignment_extend' assignment.pk %}">{% csrf_token %}<label>Nueva fecha de cierre <input type="datetime-local" name="cierra_en" required></label><button class="btn btn-secondary" type="submit">Extender</button></form><form method="post" action="{% url 'assignment_delete' assignment.pk %}">{% csrf_token %}<button class="btn btn-danger" type="submit">Eliminar si no tiene intentos</button></form></div>
+{% endblock %}

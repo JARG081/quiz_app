@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block title %}Generar quiz{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>📁 Generar quiz desde archivos</h1>
+    <div>
+        <a href="{% url 'import_quiz_json' %}" class="btn btn-secondary">🤖 Importar JSON (IA Externa)</a>
+        <a href="{% url 'quiz_list' %}" class="btn btn-ghost">Volver</a>
+    </div>
+</div>
+<div class="card"><div class="card-body"><form method="post" enctype="multipart/form-data">{% csrf_token %}{{ form.non_field_errors }}{% for field in form %}<div class="form-group"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}<label for="archivos">Archivos (1 a 3, máximo 10 MB cada uno)</label><input id="archivos" type="file" name="archivos" multiple required accept=".pdf,.docx,.pptx,.txt"><button class="btn btn-primary" type="submit">Generar borrador</button></form></div></div>
+
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block title %}Generación de quiz{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Generación de quiz</h1><a href="{% url 'quiz_list' %}" class="btn btn-ghost">Mis quizzes</a></div>
+<div id="generation-status" class="card"><div class="card-body"><h2 id="state">{{ job.estado }}</h2><p id="message">{{ job.mensaje|default:'Procesando archivos...' }}</p>{% if job.quiz_id %}<a id="quiz-link" class="btn btn-primary" href="{% url 'quiz_builder' 0 %}">Abrir constructor</a>{% endif %}</div></div>
+{% endblock %}
+{% block extra_js %}<script>
+const statusUrl = '{% url 'generation_status_json' job.pk %}';
+const state = document.getElementById('state'); const message = document.getElementById('message');
+const poll = async () => { const data = await (await fetch(statusUrl)).json(); state.textContent = data.estado; message.textContent = data.mensaje || ''; if (data.quiz_id) { window.location.href = `/quizzes/${data.quiz_id}/builder/`; } else if (data.estado === 'PENDIENTE' || data.estado === 'PROCESANDO') setTimeout(poll, 2000); }; if ('{{ job.estado }}' === 'PENDIENTE' || '{{ job.estado }}' === 'PROCESANDO') setTimeout(poll, 2000);
+</script>{% endblock %}

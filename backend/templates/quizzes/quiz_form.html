@@ -34,12 +34,6 @@
             </select>
             {{ form.course.errors }}
         </div>
-        <div class="form-group">
-            <label for="tiempo_por_pregunta">Tiempo por pregunta (segundos) *</label>
-            <input type="number" id="tiempo_por_pregunta" name="tiempo_por_pregunta" class="form-control"
-                   value="{{ form.tiempo_por_pregunta.value|default:quiz.tiempo_por_pregunta|default:30 }}" min="5" max="120" required>
-            {{ form.tiempo_por_pregunta.errors }}
-        </div>
         <div class="form-actions">
             <a href="{% url 'quiz_list' %}" class="btn btn-ghost">Cancelar</a>
             <button type="submit" class="btn btn-primary">{{ action }} Quiz</button>

@@ -1,0 +1,7 @@
+{% extends 'base.html' %}
+{% block title %}Detalle {{ course.nombre }}{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>{{ course.nombre }}</h1><p class="text-muted">Docentes: {% for teacher in teachers %}{{ teacher.username }}{% if not forloop.last %}, {% endif %}{% empty %}Ninguno{% endfor %}</p></div><a href="{% url 'admin_stats' %}" class="btn btn-ghost">Volver</a></div>
+<div class="card"><div class="card-header"><h2>Asignaciones</h2></div><div class="card-body"><table class="table"><thead><tr><th>Quiz</th><th>Apertura</th><th>Cierre</th><th>Participación</th><th>Promedio</th><th>Última actividad</th></tr></thead><tbody>{% for row in assignments %}<tr><td>{{ row.assignment.quiz.titulo }}</td><td>{{ row.assignment.abre_en }}</td><td>{{ row.assignment.cierra_en }}</td><td>{{ row.participation }}%</td><td>{{ row.average }}%</td><td>{{ row.latest|default:'-' }}</td></tr>{% empty %}<tr><td colspan="6">No hay asignaciones.</td></tr>{% endfor %}</tbody></table></div></div>
+<div class="card" style="margin-top:24px"><div class="card-header"><h2>Preguntas con menor acierto</h2></div><div class="card-body"><ol>{% for question in lowest_questions %}<li>{{ question.enunciado }}: {{ question.percentage }}%</li>{% empty %}<li>No hay respuestas enviadas.</li>{% endfor %}</ol></div></div>
+{% endblock %}

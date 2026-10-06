@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block title %}Carga Masiva de Usuarios{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>📥 Carga Masiva de Usuarios (Estudiantes y Docentes)</h1>
+    <a href="{% url 'admin_dashboard' %}" class="btn btn-ghost">Volver al Dashboard</a>
+</div>
+
+<div class="card" style="margin-bottom: 25px; border-left: 4px solid var(--primary);">
+    <div class="card-body">
+        <h3>💡 Instrucciones de Formatos Soportados</h3>
+        <p>Puedes cargar usuarios mediante <strong>CSV</strong> (separado por comas) o <strong>JSON</strong>:</p>
+        <ul>
+            <li><strong>CSV (Formato por columnas):</strong> <code>email, nombre, apellido, rol (ESTUDIANTE o DOCENTE)</code></li>
+            <li><strong>Ejemplo CSV:</strong><br>
+                <code>juan@correo.com, Juan, Pérez, ESTUDIANTE</code><br>
+                <code>maria@profesores.com, María, Gómez, DOCENTE</code>
+            </li>
+            <li><strong>JSON:</strong> <code>[{"email": "...", "nombre": "...", "apellido": "...", "rol": "ESTUDIANTE"}]</code></li>
+        </ul>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2>Subir o Pegar Listado</h2>
+    </div>
+    <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label for="default_role"><strong>Rol por defecto (si no especifica en la fila):</strong></label>
+                <select name="default_role" id="default_role" class="form-control" style="width: 100%; padding: 8px;">
+                    <option value="ESTUDIANTE">Estudiante</option>
+                    <option value="DOCENTE">Docente</option>
+                    <option value="ADMIN">Administrador</option>
+                </select>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label for="default_password"><strong>Contraseña inicial asignada:</strong></label>
+                <input type="text" name="default_password" id="default_password" value="Password123!" class="form-control" style="width: 100%; padding: 8px;">
+                <small class="text-muted">Los usuarios podrán cambiar su contraseña desde su perfil tras ingresar.</small>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label for="raw_text"><strong>Pegar texto CSV o JSON:</strong></label>
+                <textarea name="raw_text" id="raw_text" rows="8" placeholder="juan@correo.com, Juan, Pérez, ESTUDIANTE&#10;maria@profesores.com, María, Gómez, DOCENTE" class="form-control" style="width: 100%; padding: 8px; font-family: monospace;"></textarea>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 25px;">
+                <label for="file_obj"><strong>O subir archivo (.csv / .json):</strong></label>
+                <input type="file" name="file_obj" id="file_obj" accept=".csv,.json,.txt" class="form-control">
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <button type="submit" class="btn btn-primary">Procesar Carga Masiva</button>
+                <a href="{% url 'admin_dashboard' %}" class="btn btn-ghost">Cancelar</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

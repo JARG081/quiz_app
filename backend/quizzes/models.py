@@ -10,7 +10,8 @@ class Quiz(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='quizzes')
     creado_por = models.ForeignKey(User, on_delete=models.CASCADE, related_name='quizzes_created')
     publicado = models.BooleanField(default=False)
-    tiempo_por_pregunta = models.PositiveIntegerField(default=30, help_text='Segundos por pregunta')
+    hash_verificado = models.CharField(max_length=64, null=True, blank=True)
+    verificado_en = models.DateTimeField(null=True, blank=True)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
 
@@ -22,6 +23,9 @@ class Quiz(models.Model):
 
     def can_publish(self):
         return 5 <= self.total_preguntas() <= 20
+
+    def tiene_asignaciones(self):
+        return self.asignaciones.exists()
 
     def clean(self):
         if self.publicado and not self.can_publish():
@@ -71,3 +75,25 @@ class Option(models.Model):
             ).exclude(pk=self.pk)
             if existing.exists():
                 raise ValidationError('Solo puede haber una opción correcta por pregunta.')
+
+
+class TeacherVerificationAttempt(models.Model):
+    quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='verification_attempts')
+    docente = models.ForeignKey(User, on_delete=models.CASCADE, related_name='quiz_verification_attempts')
+    iniciado_en = models.DateTimeField(auto_now_add=True)
+    finalizado_en = models.DateTimeField(null=True, blank=True)
+    correctas = models.PositiveIntegerField(default=0)
+    total = models.PositiveIntegerField(default=0)
+    aprobado = models.BooleanField(default=False)
+    hash_contenido = models.CharField(max_length=64)
+
+
+class TeacherVerificationAnswer(models.Model):
+    attempt = models.ForeignKey(TeacherVerificationAttempt, on_delete=models.CASCADE, related_name='answers')
+    question = models.ForeignKey(Question, on_delete=models.CASCADE)
+    option_marcada = models.ForeignKey(Option, on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['attempt', 'question'], name='unique_teacher_verification_answer'),
+        ]

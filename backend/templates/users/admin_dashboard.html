@@ -4,8 +4,12 @@
 {% block content %}
 <div class="page-header">
     <h1>🛡️ Panel de Administrador</h1>
-    <a href="{% url 'create_user' %}" class="btn btn-primary">+ Nuevo Usuario</a>
+    <div>
+        <a href="{% url 'bulk_import_users' %}" class="btn btn-secondary">📥 Carga Masiva (CSV/JSON)</a>
+        <a href="{% url 'create_user' %}" class="btn btn-primary">+ Nuevo Usuario</a>
+    </div>
 </div>
+
 
 {% if total > 0 %}
     {% for grupo in grupos %}
@@ -19,6 +23,7 @@
                 <table class="table" style="margin:0;">
                     <thead>
                         <tr>
+                            <th>Nombre / Alias Visible</th>
                             <th>Usuario</th>
                             <th>Email</th>
                             <th>Rol</th>
@@ -30,8 +35,9 @@
                         <tr>
                             <td>
                                 <span class="user-icon">{{ grupo.icon }}</span>
-                                {{ u.username }}
+                                <strong>{{ u.profile.display_name }}</strong>
                             </td>
+                            <td>{{ u.username }}</td>
                             <td>{{ u.email|default:"—" }}</td>
                             <td>
                                 <span class="role-badge role-{{ u.profile.role|lower }}">{{ u.profile.role }}</span>
@@ -66,6 +72,10 @@
     <a href="{% url 'course_list' %}" class="quick-link-card">
         <span class="ql-icon">📚</span>
         <span>Gestionar Cursos</span>
+    </a>
+    <a href="{% url 'admin_stats' %}" class="quick-link-card">
+        <span class="ql-icon">📊</span>
+        <span>Estadísticas generales</span>
     </a>
 </div>
 {% endblock %}

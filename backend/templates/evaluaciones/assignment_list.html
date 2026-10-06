@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block title %}Asignaciones{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Asignaciones</h1><a href="{% url 'quiz_list' %}" class="btn btn-secondary">Mis quizzes</a></div>
+<div class="card"><div class="card-body">
+{% if assignments %}
+<table class="data-table"><thead><tr><th>Quiz</th><th>Curso</th><th>Estado</th><th>Participación</th><th>Promedio</th><th></th></tr></thead><tbody>
+{% for assignment in assignments %}<tr><td>{{ assignment.quiz.titulo }}</td><td>{{ assignment.quiz.course.nombre }}</td><td>{{ assignment.estado }}</td><td>{{ assignment.participacion }}/{{ assignment.inscritos_count }}</td><td>{% if assignment.promedio is not None %}{{ assignment.promedio }}%{% else %}-{% endif %}</td><td><a href="{% url 'assignment_results' assignment.pk %}" class="btn btn-sm btn-primary">Resultados</a></td></tr>{% endfor %}
+</tbody></table>
+{% else %}<div class="empty-state"><p>Aún no tienes asignaciones.</p></div>{% endif %}
+</div></div>
+{% endblock %}

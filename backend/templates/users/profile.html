@@ -1,0 +1,6 @@
+{% extends 'base.html' %}
+{% block title %}Mi perfil{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Mi perfil</h1><a href="{{ request.user.profile.dashboard_url }}" class="btn btn-ghost">Volver</a></div>
+<div class="card card-md"><div class="card-body"><form method="post" class="form-vertical">{% csrf_token %}{{ form.non_field_errors }}{% for field in form %}<div class="form-group"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}<button class="btn btn-primary" type="submit">Guardar cambios</button></form></div></div>
+{% endblock %}

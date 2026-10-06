@@ -18,6 +18,9 @@ services:
     build:
       context: ./backend
     restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
     environment:
       DEBUG: "0"
       SECRET_KEY: "docker-secret-key-change-me"

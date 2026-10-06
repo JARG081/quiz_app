@@ -41,12 +41,6 @@ class ForgotPasswordForm(forms.Form):
     """Formulario para solicitar recuperación de contraseña."""
     email = forms.EmailField(label='Correo electrónico')
 
-    def clean_email(self):
-        email = self.cleaned_data['email'].strip()
-        if not User.objects.filter(email=email).exists():
-            raise forms.ValidationError('No hay cuenta asociada con este correo.')
-        return email
-
 
 class ResetPasswordForm(forms.Form):
     """Formulario para restablecer contraseña con confirmación."""
@@ -65,3 +59,33 @@ class ResetPasswordForm(forms.Form):
             raise forms.ValidationError('Las contraseñas no coinciden.')
         
         return cleaned_data
+
+
+class OwnProfileForm(forms.Form):
+    alias = forms.CharField(label='Alias / Nombre Visible (oculta tu correo)', max_length=50, required=False)
+    email = forms.EmailField(label='Correo electrónico', required=False)
+    first_name = forms.CharField(label='Nombre', max_length=150, required=False)
+    last_name = forms.CharField(label='Apellido', max_length=150, required=False)
+    current_password = forms.CharField(label='Contraseña actual', required=False, widget=forms.PasswordInput)
+    new_password = forms.CharField(label='Nueva contraseña', required=False, widget=forms.PasswordInput)
+    new_password_confirm = forms.CharField(label='Confirmar nueva contraseña', required=False, widget=forms.PasswordInput)
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
+
+    def clean(self):
+        cleaned = super().clean()
+        new_password = cleaned.get('new_password', '')
+        confirmation = cleaned.get('new_password_confirm', '')
+        current_password = cleaned.get('current_password', '')
+        if new_password:
+            if not current_password or not self.user or not self.user.check_password(current_password):
+                self.add_error('current_password', 'La contraseña actual no es correcta.')
+            if len(new_password) < 8:
+                self.add_error('new_password', 'La nueva contraseña debe tener al menos 8 caracteres.')
+            if new_password != confirmation:
+                self.add_error('new_password_confirm', 'Las contraseñas no coinciden.')
+        elif confirmation:
+            self.add_error('new_password', 'Escribe una nueva contraseña.')
+        return cleaned

@@ -1,61 +1,7 @@
 {% extends 'base.html' %}
-{% block title %}Mis Estadísticas – QuizLive{% endblock %}
-
+{% block title %}Mis Estadísticas{% endblock %}
 {% block content %}
-<div class="page-header">
-    <h1>📊 Mis Estadísticas</h1>
-    <a href="{% url 'estudiante_dashboard' %}" class="btn btn-ghost">← Inicio</a>
-</div>
-
-<div class="stats-row">
-    <div class="stat-card">
-        <span class="stat-number">{{ quiz_stats|length }}</span>
-        <span class="stat-label">Quizzes completados</span>
-    </div>
-    <div class="stat-card">
-        <span class="stat-number">{{ avg_general }}%</span>
-        <span class="stat-label">Promedio general</span>
-    </div>
-</div>
-
-{% if quiz_stats %}
-<div class="stats-table card">
-    <div class="card-header"><h2>Historial de participaciones</h2></div>
-    <div class="card-body">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Quiz</th>
-                    <th>Curso</th>
-                    <th>Correctas</th>
-                    <th>Score</th>
-                    <th>Fecha</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for s in quiz_stats %}
-                <tr>
-                    <td>{{ s.quiz.titulo }}</td>
-                    <td>{{ s.quiz.course.nombre }}</td>
-                    <td>{{ s.correctas }} / {{ s.total }}</td>
-                    <td>
-                        <div class="score-bar-wrap">
-                            <div class="score-bar" {{ s.width_attr|safe }}></div>
-                            <span>{{ s.score }}%</span>
-                        </div>
-                    </td>
-                    <td>{{ s.session.fecha_fin|date:"d/m/Y"|default:"—" }}</td>
-                    <td><a href="{% url 'session_results' s.session.pk %}" class="btn btn-sm btn-ghost">Ver</a></td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-{% else %}
-<div class="empty-state card">
-    <p>Aún no has participado en ninguna sesión finalizada.</p>
-</div>
-{% endif %}
+<div class="page-header"><h1>📊 Mis Estadísticas</h1><a href="{% url 'estudiante_dashboard' %}" class="btn btn-ghost">← Inicio</a></div>
+<div class="stats-row"><div class="stat-card"><span class="stat-number">{{ quiz_stats|length }}</span><span class="stat-label">Quices completados</span></div><div class="stat-card"><span class="stat-number">{{ avg_general }}%</span><span class="stat-label">Promedio general</span></div></div>
+{% if quiz_stats %}<div class="stats-table card"><div class="card-header"><h2>Resultados por asignación</h2></div><div class="card-body"><table class="table"><thead><tr><th>Quiz</th><th>Curso</th><th>Aciertos</th><th>Nota</th><th>Fecha</th><th></th></tr></thead><tbody>{% for item in quiz_stats %}<tr><td>{{ item.quiz.titulo }}</td><td>{{ item.quiz.course.nombre }}</td><td>{{ item.correctas }} / {{ item.total }}</td><td>{{ item.score }}%</td><td>{{ item.submitted_at|date:'d/m/Y' }}</td><td><a href="{% url 'attempt_review' item.attempt.pk %}" class="btn btn-sm btn-ghost">Ver</a></td></tr>{% endfor %}</tbody></table></div></div>{% else %}<div class="empty-state card"><p>Aún no has completado ninguna asignación.</p></div>{% endif %}
 {% endblock %}

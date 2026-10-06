@@ -1,0 +1,143 @@
+{% extends 'base.html' %}
+{% block title %}Importar Quiz desde JSON / IA Externa{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🤖 Importar Quiz desde IA Externa (JSON)</h1>
+    <a href="{% url 'quiz_list' %}" class="btn btn-ghost">Volver a mis quizzes</a>
+</div>
+
+<div class="card" style="margin-bottom: 25px; border-left: 5px solid var(--primary); background: rgba(99, 102, 241, 0.05);">
+    <div class="card-body">
+        <h3 style="margin-top: 0; display: flex; align-items: center; justify-content: space-between;">
+            <span>📋 Prompt listo para usar en ChatGPT, Claude, Gemini o DeepSeek</span>
+            <button id="copyPromptBtn" type="button" class="btn btn-sm btn-primary" onclick="copyPromptToClipboard()">
+                Copiar Prompt para IA 📋
+            </button>
+        </h3>
+        <p class="text-muted">Copia este prompt, pégalo en tu proveedor de IA favorito iniciando sesión con tu cuenta de Gmail, y luego pega el JSON resultante abajo.</p>
+
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px;">
+            <a href="https://chatgpt.com" target="_blank" class="btn btn-sm" style="background: #10a37f; color: white; border: none; text-decoration: none;">
+                🟢 Abrir ChatGPT (Gmail)
+            </a>
+            <a href="https://claude.ai" target="_blank" class="btn btn-sm" style="background: #d97706; color: white; border: none; text-decoration: none;">
+                🟠 Abrir Claude (Gmail)
+            </a>
+            <a href="https://chat.deepseek.com" target="_blank" class="btn btn-sm" style="background: #4f46e5; color: white; border: none; text-decoration: none;">
+                🔵 Abrir DeepSeek (Gmail)
+            </a>
+            <a href="https://gemini.google.com" target="_blank" class="btn btn-sm" style="background: #ea4335; color: white; border: none; text-decoration: none;">
+                🔴 Abrir Gemini (Google/Gmail)
+            </a>
+        </div>
+
+        <pre id="promptTemplateText" style="background: var(--bg-card, #1e293b); color: var(--text, #f8fafc); padding: 15px; border-radius: 8px; font-size: 13px; white-space: pre-wrap; border: 1px solid var(--border-color, #334155); overflow-x: auto;">Genera un quiz de 10 preguntas sobre [PEGA AQUÍ TU TEMA O TEXTO COMPLETO].
+IMPORTANTE: Responde ÚNICAMENTE con un objeto JSON válido (sin comentarios, ni introducciones ni texto fuera del JSON) con esta estructura exacta:
+
+{
+  "preguntas": [
+    {
+      "tipo": "MC",
+      "enunciado": "¿En qué año comenzó la Revolución Industrial?",
+      "opciones": {
+        "A": "1750",
+        "B": "1800",
+        "C": "1850",
+        "D": "1900"
+      },
+      "correcta": "A",
+      "explicacion": "Comenzó aproximadamente en la segunda mitad del siglo XVIII (1750)."
+    },
+    {
+      "tipo": "VF",
+      "enunciado": "La máquina de vapor favoreció la expansión de la industria textil y del hierro.",
+      "opciones": {
+        "A": "Verdadero",
+        "B": "Falso"
+      },
+      "correcta": "A",
+      "explicacion": "El uso del vapor fue clave para el transporte y la industria manufacturera."
+    }
+  ]
+}
+
+REGLAS DE FORMATO:
+1. "tipo" puede ser "MC" (Opción múltiple) o "VF" (Verdadero/Falso).
+2. Para "MC": debe incluir las 4 opciones A, B, C, D y "correcta" debe ser una letra de "A" a "D".
+3. Para "VF": "opciones" debe ser A="Verdadero" y B="Falso", y "correcta" debe ser "A" u "B".
+4. Agrega una breve explicación para cada pregunta.</pre>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2>📥 Cargar el JSON generado</h2>
+    </div>
+    <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger" style="background: rgba(239,68,68,0.15); border-left: 4px solid var(--danger); padding: 12px; margin-bottom: 20px; border-radius: 4px;">
+                {{ form.non_field_errors }}
+            </div>
+            {% endif %}
+
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label for="{{ form.course.id_for_label }}"><strong>{{ form.course.label }}</strong></label>
+                {{ form.course }}
+                {{ form.course.errors }}
+            </div>
+
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label for="{{ form.titulo.id_for_label }}"><strong>{{ form.titulo.label }}</strong></label>
+                {{ form.titulo }}
+                {{ form.titulo.errors }}
+            </div>
+
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label for="{{ form.descripcion.id_for_label }}"><strong>{{ form.descripcion.label }}</strong></label>
+                {{ form.descripcion }}
+                {{ form.descripcion.errors }}
+            </div>
+
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label for="{{ form.json_text.id_for_label }}"><strong>{{ form.json_text.label }}</strong></label>
+                {{ form.json_text }}
+                {{ form.json_text.errors }}
+            </div>
+
+            <div class="form-group" style="margin-bottom: 25px;">
+                <label for="{{ form.archivo_json.id_for_label }}"><strong>{{ form.archivo_json.label }}</strong></label>
+                {{ form.archivo_json }}
+                {{ form.archivo_json.errors }}
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <button type="submit" class="btn btn-primary">Crear Quiz desde JSON</button>
+                <a href="{% url 'quiz_list' %}" class="btn btn-ghost">Cancelar</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function copyPromptToClipboard() {
+    const promptText = document.getElementById('promptTemplateText').innerText;
+    navigator.clipboard.writeText(promptText).then(() => {
+        const btn = document.getElementById('copyPromptBtn');
+        const origText = btn.innerText;
+        btn.innerText = '¡Copiado con éxito! ✅';
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-success');
+        setTimeout(() => {
+            btn.innerText = origText;
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-primary');
+        }, 2500);
+    }).catch(err => {
+        alert('No se pudo copiar automáticamente. Puedes seleccionar el texto manualmente.');
+    });
+}
+</script>
+{% endblock %}

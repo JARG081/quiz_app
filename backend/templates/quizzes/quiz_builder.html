@@ -6,14 +6,17 @@
     <a href="{% url 'quiz_list' %}" class="btn btn-ghost">← Mis Quizzes</a>
     <h1>🔧 {{ quiz.titulo }}</h1>
     <div class="header-actions">
-        <a href="{% url 'quiz_edit' quiz.pk %}" class="btn btn-secondary">Editar Info</a>
+        {% if not tiene_asignaciones %}<a href="{% url 'quiz_edit' quiz.pk %}" class="btn btn-secondary">Editar Info</a>{% endif %}
+        {% if tiene_asignaciones %}<form method="post" action="{% url 'duplicate_quiz' quiz.pk %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-primary">Duplicar para modificar</button></form>{% endif %}
+        {% if not tiene_asignaciones %}<a href="{% url 'verify_quiz' quiz.pk %}" class="btn btn-secondary">Resolver verificación</a>{% endif %}
+        {% if quiz.publicado %}<a href="{% url 'assignment_create' quiz.pk %}" class="btn btn-primary">Asignar al curso</a>{% endif %}
         <form method="post" action="{% url 'toggle_publish' quiz.pk %}" style="display:inline;">
             {% csrf_token %}
             {% if quiz.publicado %}
             <button type="submit" class="btn btn-warning">Despublicar</button>
             {% else %}
-            {% if not can_publish %}
-            <button type="submit" class="btn btn-success" disabled title="Necesita entre 5 y 20 preguntas con 4 opciones y 1 correcta">
+            {% if not can_publish or not verificado %}
+            <button type="submit" class="btn btn-success" disabled title="Necesita contenido válido y verificación aprobada">
                 Publicar
             </button>
             {% else %}
@@ -36,7 +39,9 @@
         📋 Borrador
     </span>
     {% endif %}
-    <span class="status-info">{{ total }} preguntas | {{ quiz.tiempo_por_pregunta }}s por pregunta | Curso: {{ quiz.course.nombre }}</span>
+    <span class="status-info">{{ total }} preguntas | Curso: {{ quiz.course.nombre }}</span>
+    {% if verificado %}<span class="status-pill status-published">✅ Verificado</span>{% else %}<span class="status-pill status-warning">⚠️ Sin verificar</span>{% endif %}
+    {% if tiene_asignaciones %}<span class="status-warning">Este quiz ya fue asignado. Duplícalo para modificarlo.</span>{% endif %}
     {% if not can_publish and not quiz.publicado %}
     <span class="status-warning">⚠️ Necesitas entre 5 y 20 preguntas para publicar (tienes {{ total }})</span>
     {% endif %}
@@ -44,7 +49,7 @@
 
 <div class="builder-container">
     <!-- Add Question -->
-    {% if not quiz.publicado %}
+    {% if not quiz.publicado and not tiene_asignaciones %}
     <div class="card add-question-card" style="padding: 20px; margin-bottom: 40px; border: 2px dashed var(--border);">
         <h3 style="text-align:center; margin-bottom: 20px;">➕ Agregar Nueva Pregunta</h3>
         <form method="post" action="{% url 'add_question' quiz.pk %}" enctype="multipart/form-data" class="builder-form">
@@ -181,7 +186,7 @@
                 {% endfor %}
             </div>
             
-            {% if not quiz.publicado %}
+            {% if not quiz.publicado and not tiene_asignaciones %}
             <div class="question-actions" style="text-align:center; padding-top:15px; border-top: 1px solid var(--border);">
                 <a href="{% url 'edit_question' quiz.pk q.pk %}" class="btn btn-secondary btn-square" style="border-radius:4px; padding:8px 20px;">Editar</a>
                 <form method="post" action="{% url 'delete_question' quiz.pk q.pk %}" style="display:inline;">
@@ -215,7 +220,7 @@
     const quizId = '{{ quiz.pk }}';
     const isPublished = {{ quiz.publicado|lower }};
 
-    if (!isPublished && questionsList) {
+    if (!isPublished && questionsList && {{ tiene_asignaciones|yesno:'false,true' }}) {
         questionsList.addEventListener('dragstart', (e) => {
             draggedElement = e.target.closest('.question-card');
             draggedElement.style.opacity = '0.5';

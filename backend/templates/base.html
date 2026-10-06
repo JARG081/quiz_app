@@ -23,6 +23,7 @@
             {{ request.user.username }}
             <span class="role-badge role-{{ request.user.profile.role|lower }}">{{ request.user.profile.role }}</span>
         </span>
+        <a href="{% url 'profile' %}" class="btn btn-sm btn-ghost">Perfil</a>
         <a href="{% url 'logout' %}" class="btn btn-sm btn-ghost">Salir</a>
     </div>
     {% endif %}
