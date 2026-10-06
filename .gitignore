@@ -8,3 +8,5 @@ venv/
 .venv/
 .env
 .coverage
+pruebas.md
+*.pdf
